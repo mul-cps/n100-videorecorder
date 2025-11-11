@@ -1,0 +1,62 @@
+network:
+  version: 2
+  renderer: networkd
+  
+  # Ethernet configuration (if available)
+  ethernets:
+    enp1s0:  # Common interface name for Intel N100 systems
+      dhcp4: true
+      dhcp6: true
+      optional: true
+      
+  # WiFi configuration
+  wifis:
+    # Common WiFi interface names for Intel N100 systems
+    wlp0s20f3:  # Intel AX101/AX201 WiFi card
+      dhcp4: true
+      dhcp6: true
+      optional: true
+      
+      # Multiple access points for redundancy
+      access-points:
+        "YOUR_MAIN_SSID":
+          password: "YOUR_MAIN_PASSWORD"
+          priority: 100
+          
+        "YOUR_BACKUP_SSID": 
+          password: "YOUR_BACKUP_PASSWORD"
+          priority: 50
+          
+        "GUEST_NETWORK":
+          password: "GUEST_PASSWORD"
+          priority: 10
+          
+      # WiFi power management (disable for better stability)
+      wakeonwlan: []
+      
+    # Alternative interface name (in case the above doesn't match)
+    wlan0:
+      dhcp4: true
+      dhcp6: true
+      optional: true
+      access-points:
+        "YOUR_MAIN_SSID":
+          password: "YOUR_MAIN_PASSWORD"
+
+# Additional configuration for stability
+# Uncomment and modify as needed:
+
+# Static IP configuration (if you prefer static over DHCP):
+#  ethernets:
+#    enp1s0:
+#      addresses:
+#        - 192.168.1.100/24
+#      gateway4: 192.168.1.1
+#      nameservers:
+#        addresses: [8.8.8.8, 1.1.1.1]
+
+# Custom DNS (if you want to override DHCP DNS):
+#  wifis:
+#    wlp0s20f3:
+#      nameservers:
+#        addresses: [8.8.8.8, 1.1.1.1, 192.168.1.1]

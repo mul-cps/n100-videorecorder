@@ -1,0 +1,45 @@
+# USB Camera Persistent Device Mapping Rules
+#
+# This file ensures USB cameras get consistent /dev/videoX device nodes
+# regardless of plug order or system restarts.
+#
+# To customize for your specific cameras:
+# 1. Plug in your cameras
+# 2. Run: lsusb 
+# 3. Find your camera's Vendor ID and Product ID
+# 4. Run: udevadm info -a -p $(udevadm info -q path -n /dev/video0)
+# 5. Update the rules below with your camera's specific IDs
+
+# Example rules for common USB cameras:
+# Replace XXXX and YYYY with your camera's actual vendor/product IDs
+
+# Camera 1 - Primary camera
+# SUBSYSTEM=="video4linux", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="YYYY", SYMLINK+="video-cam1", GROUP="video", MODE="0664"
+
+# Camera 2 - Secondary camera  
+# SUBSYSTEM=="video4linux", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="YYYY", SYMLINK+="video-cam2", GROUP="video", MODE="0664"
+
+# Generic rules based on USB bus position (less reliable but works for most setups)
+# These create predictable names based on which USB port the camera is plugged into
+
+# USB Bus 1 cameras
+SUBSYSTEM=="video4linux", ATTRS{busnum}=="1", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb1-%k", GROUP="video", MODE="0664"
+
+# USB Bus 2 cameras
+SUBSYSTEM=="video4linux", ATTRS{busnum}=="2", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb2-%k", GROUP="video", MODE="0664"
+
+# USB Bus 3 cameras
+SUBSYSTEM=="video4linux", ATTRS{busnum}=="3", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb3-%k", GROUP="video", MODE="0664"
+
+# USB Bus 4 cameras
+SUBSYSTEM=="video4linux", ATTRS{busnum}=="4", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb4-%k", GROUP="video", MODE="0664"
+
+# Ensure video devices have correct permissions
+SUBSYSTEM=="video4linux", GROUP="video", MODE="0664"
+
+# Graphics devices for hardware acceleration
+SUBSYSTEM=="drm", KERNEL=="renderD*", GROUP="render", MODE="0664"
+SUBSYSTEM=="drm", KERNEL=="card*", GROUP="video", MODE="0664"
+
+# Intel GPU specific
+SUBSYSTEM=="drm", DRIVERS=="i915", GROUP="render", MODE="0664"

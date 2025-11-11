@@ -1,0 +1,61 @@
+[Unit]
+Description=Dual 4K Camera QSV Recording Service
+After=network.target graphical-session.target
+Wants=network.target
+Requires=graphical-session.target
+
+[Service]
+Type=simple
+User=youruser
+Group=video
+WorkingDirectory=/home/youruser
+Environment="LIBVA_DRIVER_NAME=iHD"
+Environment="GST_VAAPI_ALL_DRIVERS=1"
+Environment="DISPLAY=:0"
+
+# Wait for cameras to be ready
+ExecStartPre=/bin/sleep 15
+ExecStartPre=/usr/bin/modprobe uvcvideo
+ExecStartPre=/bin/bash -c 'while [ ! -c /dev/video0 ] || [ ! -c /dev/video2 ]; do sleep 2; done'
+
+# Main recording command
+ExecStart=/usr/local/bin/dual-camera-record.sh
+
+# Graceful shutdown
+ExecStop=/bin/kill -TERM $MAINPID
+TimeoutStopSec=30
+
+# Restart configuration
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dual-camera-record
+
+# Security and permissions
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectKernelModules=false
+RestrictRealtime=true
+
+# Device access
+DeviceAllow=/dev/dri/renderD128 rw
+DeviceAllow=/dev/dri/card0 rw
+DeviceAllow=/dev/video0 rw
+DeviceAllow=/dev/video1 rw  
+DeviceAllow=/dev/video2 rw
+DeviceAllow=/dev/video3 rw
+SupplementaryGroups=video render
+
+# Resource limits (adjust based on your system)
+LimitNOFILE=4096
+OOMScoreAdjust=-100
+
+[Install]
+WantedBy=multi-user.target
