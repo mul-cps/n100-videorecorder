@@ -268,19 +268,68 @@ log "Camera 2 recording started with PID: $CAM2_PID"
 shutdown() {
     log "Received shutdown signal, stopping recordings..."
     
+    # Stop the monitoring process first
+    if [[ -n "$MONITOR_PID" ]] && kill -0 $MONITOR_PID 2>/dev/null; then
+        kill -TERM $MONITOR_PID 2>/dev/null || true
+    fi
+    
+    # Send SIGINT to FFmpeg processes for graceful shutdown
+    # FFmpeg will properly finalize the video files when receiving SIGINT
     if kill -0 $CAM1_PID 2>/dev/null; then
         log "Stopping Camera 1 (PID: $CAM1_PID)"
-        kill -TERM $CAM1_PID
+        kill -INT $CAM1_PID 2>/dev/null
     fi
     
     if kill -0 $CAM2_PID 2>/dev/null; then
         log "Stopping Camera 2 (PID: $CAM2_PID)"
-        kill -TERM $CAM2_PID
+        kill -INT $CAM2_PID 2>/dev/null
     fi
     
-    # Wait for processes to finish
+    # Give FFmpeg time to close files properly
+    local timeout=10
+    local elapsed=0
+    
+    log "Waiting for FFmpeg processes to finalize recordings..."
+    
+    while (( elapsed < timeout )); do
+        local cam1_alive=0
+        local cam2_alive=0
+        
+        kill -0 $CAM1_PID 2>/dev/null && cam1_alive=1
+        kill -0 $CAM2_PID 2>/dev/null && cam2_alive=1
+        
+        if [[ $cam1_alive -eq 0 ]] && [[ $cam2_alive -eq 0 ]]; then
+            log "Both cameras stopped gracefully"
+            break
+        fi
+        
+        sleep 1
+        ((elapsed++))
+        
+        # Log progress
+        if (( elapsed % 3 == 0 )); then
+            local status=""
+            [[ $cam1_alive -eq 1 ]] && status+="Camera1 "
+            [[ $cam2_alive -eq 1 ]] && status+="Camera2 "
+            [[ -n "$status" ]] && log "Waiting for: $status(${elapsed}s)"
+        fi
+    done
+    
+    # Force kill if still running after timeout
+    if kill -0 $CAM1_PID 2>/dev/null; then
+        log "Camera 1 didn't stop gracefully after ${timeout}s, forcing shutdown"
+        kill -KILL $CAM1_PID 2>/dev/null || true
+    fi
+    
+    if kill -0 $CAM2_PID 2>/dev/null; then
+        log "Camera 2 didn't stop gracefully after ${timeout}s, forcing shutdown"
+        kill -KILL $CAM2_PID 2>/dev/null || true
+    fi
+    
+    # Final wait
     wait $CAM1_PID 2>/dev/null || true
     wait $CAM2_PID 2>/dev/null || true
+    wait $MONITOR_PID 2>/dev/null || true
     
     log "Recording stopped cleanly"
     exit 0

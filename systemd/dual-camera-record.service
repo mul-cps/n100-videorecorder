@@ -12,15 +12,20 @@ Environment="LIBVA_DRIVER_NAME=iHD"
 Environment="GST_VAAPI_ALL_DRIVERS=1"
 
 # Wait for cameras to be ready
+# Check for both direct devices and persistent symlinks
 ExecStartPre=/bin/sleep 5
-ExecStartPre=/bin/bash -c 'while [ ! -c /dev/video0 ] || [ ! -c /dev/video2 ]; do sleep 2; done'
+ExecStartPre=/bin/bash -c 'for i in {1..30}; do [ -c /dev/video0 ] || [ -L /dev/video-usb1-video0 ] && break; sleep 2; done'
+ExecStartPre=/bin/bash -c 'for i in {1..30}; do ([ -c /dev/video3 ] || [ -L /dev/video-usb2-video3 ]) && break; sleep 2; done'
 
 # Main recording command
 ExecStart=/home/bjoern/git/n100-videorecorder/scripts/dual-camera-record.sh
 
-# Graceful shutdown
-ExecStop=/bin/kill -TERM $MAINPID
-TimeoutStopSec=30
+# Graceful shutdown - SIGINT is better for FFmpeg than SIGTERM
+# FFmpeg properly closes files when receiving SIGINT
+KillSignal=SIGINT
+ExecStop=/bin/kill -INT $MAINPID
+TimeoutStopSec=15
+KillMode=mixed
 
 # Restart configuration
 Restart=on-failure
