@@ -29,12 +29,12 @@ RECORDINGS_BASE="${RECORDINGS_BASE:-/storage/recordings}"
 # Runtime variables
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 # Try to find the correct FFmpeg binary
-if [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg7" ]]; then
-    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg7"
-elif [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg6" ]]; then
-    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg6"
-else
+if [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg" ]]; then
     FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+elif [[ -x "/usr/local/bin/ffmpeg-qsv" ]]; then
+    FFMPEG="/usr/local/bin/ffmpeg-qsv"
+else
+    FFMPEG="ffmpeg"
 fi
 LOG_DIR="/var/log/camera-recorder"
 

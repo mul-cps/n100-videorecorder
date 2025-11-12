@@ -185,16 +185,16 @@ install_jellyfin_ffmpeg() {
     if apt-cache show jellyfin-ffmpeg7 &>/dev/null; then
         log "Installing jellyfin-ffmpeg7..."
         apt install -y jellyfin-ffmpeg7
-        FFMPEG_PATH="/usr/lib/jellyfin-ffmpeg/ffmpeg7"
     elif apt-cache show jellyfin-ffmpeg6 &>/dev/null; then
         log "Installing jellyfin-ffmpeg6..."
         apt install -y jellyfin-ffmpeg6
-        FFMPEG_PATH="/usr/lib/jellyfin-ffmpeg/ffmpeg6"
     else
         log "Installing jellyfin-ffmpeg (legacy)..."
         apt install -y jellyfin-ffmpeg
-        FFMPEG_PATH="/usr/lib/jellyfin-ffmpeg/ffmpeg"
     fi
+    
+    # The binary is always at the same location regardless of package version
+    FFMPEG_PATH="/usr/lib/jellyfin-ffmpeg/ffmpeg"
     
     # Create symlink for easier access
     ln -sf "$FFMPEG_PATH" /usr/local/bin/ffmpeg-qsv
@@ -263,7 +263,21 @@ setup_udev_rules() {
     udevadm control --reload-rules
     udevadm trigger
     
-    log "USB camera mapping rules installed"
+    # Ensure existing device nodes get the correct group/permissions now
+    if compgen -G "/dev/video*" > /dev/null; then
+        for dev in /dev/video*; do
+            # Only operate on character devices
+            if [[ -c "$dev" ]]; then
+                chown root:video "$dev" || true
+                chmod 660 "$dev" || true
+            fi
+        done
+    fi
+
+    # Make sure the install user is in the video and render groups
+    usermod -a -G video,render "$INSTALL_USER" || true
+
+    log "USB camera mapping rules installed and device permissions adjusted"
 }
 
 setup_logrotate() {

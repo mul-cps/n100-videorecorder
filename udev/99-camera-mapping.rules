@@ -23,19 +23,19 @@
 # These create predictable names based on which USB port the camera is plugged into
 
 # USB Bus 1 cameras
-SUBSYSTEM=="video4linux", ATTRS{busnum}=="1", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb1-%k", GROUP="video", MODE="0664"
+SUBSYSTEM=="video4linux", ATTRS{busnum}=="1", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb1-%k", GROUP="video", MODE="0660"
 
 # USB Bus 2 cameras
-SUBSYSTEM=="video4linux", ATTRS{busnum}=="2", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb2-%k", GROUP="video", MODE="0664"
+SUBSYSTEM=="video4linux", ATTRS{busnum}=="2", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb2-%k", GROUP="video", MODE="0660"
 
 # USB Bus 3 cameras
-SUBSYSTEM=="video4linux", ATTRS{busnum}=="3", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb3-%k", GROUP="video", MODE="0664"
+SUBSYSTEM=="video4linux", ATTRS{busnum}=="3", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb3-%k", GROUP="video", MODE="0660"
 
 # USB Bus 4 cameras
-SUBSYSTEM=="video4linux", ATTRS{busnum}=="4", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb4-%k", GROUP="video", MODE="0664"
+SUBSYSTEM=="video4linux", ATTRS{busnum}=="4", ATTRS{devnum}=="*", KERNEL=="video[0-9]*", SYMLINK+="video-usb4-%k", GROUP="video", MODE="0660"
 
-# Ensure video devices have correct permissions
-SUBSYSTEM=="video4linux", GROUP="video", MODE="0664"
+# Ensure video devices have correct permissions (group-only access)
+SUBSYSTEM=="video4linux", GROUP="video", MODE="0660"
 
 # Graphics devices for hardware acceleration
 SUBSYSTEM=="drm", KERNEL=="renderD*", GROUP="render", MODE="0664"

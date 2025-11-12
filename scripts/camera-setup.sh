@@ -212,8 +212,8 @@ test_4k_capability() {
                 log "$device supports 4K in $format format - GOOD!"
                 
                 # Quick test capture based on format
-                local ffmpeg_cmd="/usr/lib/jellyfin-ffmpeg/ffmpeg7"
-                [[ ! -x "$ffmpeg_cmd" ]] && ffmpeg_cmd="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+                local ffmpeg_cmd="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+                [[ ! -x "$ffmpeg_cmd" ]] && ffmpeg_cmd="ffmpeg"
                 
                 if [[ "$format" == "h264" ]]; then
                     timeout 3s "$ffmpeg_cmd" \

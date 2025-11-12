@@ -17,12 +17,12 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Configuration
 # Try to find the correct FFmpeg binary
-if [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg7" ]]; then
-    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg7"
-elif [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg6" ]]; then
-    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg6"
-else
+if [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg" ]]; then
     FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+elif [[ -x "/usr/local/bin/ffmpeg-qsv" ]]; then
+    FFMPEG="/usr/local/bin/ffmpeg-qsv"
+else
+    FFMPEG="ffmpeg"
 fi
 TEST_DURATION=10
 TEST_DIR="/tmp/camera-test"
@@ -338,6 +338,34 @@ main() {
         error "FFmpeg not found at $FFMPEG"
         exit 1
     fi
+
+    # Check device permissions so users don't have to run tests as root
+    check_device_permissions() {
+        local dev="/dev/video0"
+        if [[ ! -e "$dev" ]]; then
+            warn "Device $dev not present yet"
+            return 0
+        fi
+
+        # If we can read and write the device as the current user, everything's fine
+        if [[ -r "$dev" && -w "$dev" ]]; then
+            return 0
+        fi
+
+        warn "Current user does not have read/write access to $dev."
+        echo
+        echo "To fix this so you don't need sudo, run one of the following (recommended):"
+        echo "  1) Add your user to the 'video' group and re-login:" \
+             "sudo usermod -a -G video \$USER && echo 'Then log out and log back in (or run: newgrp video)'"
+        echo
+        echo "  2) (Immediate, temporary) Fix current device nodes (will be reset on re-plug):"
+        echo "sudo chown root:video /dev/video* && sudo chmod 660 /dev/video*"
+        echo
+        echo "If you installed this via the deploy script, the deploy process already adds the install user to the 'video' group — you must re-login for the change to take effect."
+        echo
+    }
+
+    check_device_permissions
     
     check_system_resources
     
