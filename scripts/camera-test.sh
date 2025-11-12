@@ -59,6 +59,7 @@ test_basic_capture() {
     
     if [[ "$format" == "h264" ]]; then
         # H264 input - re-encode to HEVC with QSV for space savings
+        log "Command: $FFMPEG -f v4l2 -input_format h264 -video_size 1920x1080 -framerate 30 -i $device -c:v hevc_qsv -preset fast -global_quality 28"
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format h264 \
@@ -68,8 +69,9 @@ test_basic_capture() {
             -c:v hevc_qsv \
             -preset fast \
             -global_quality 28 \
-            -y "$output" &>/dev/null
+            -y "$output" 2>&1 | tee /tmp/basic_capture_test.log | tail -20
     elif [[ "$format" == "mjpeg" ]]; then
+        log "Command: $FFMPEG -f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30 -i $device -c:v hevc_qsv -preset fast -global_quality 28"
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format mjpeg \
@@ -79,8 +81,9 @@ test_basic_capture() {
             -c:v hevc_qsv \
             -preset fast \
             -global_quality 28 \
-            -y "$output" &>/dev/null
+            -y "$output" 2>&1 | tee /tmp/basic_capture_test.log | tail -20
     else
+        log "Command: $FFMPEG -f v4l2 -video_size 1920x1080 -framerate 30 -i $device -c:v hevc_qsv -preset fast -global_quality 28"
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -video_size 1920x1080 \
@@ -89,15 +92,18 @@ test_basic_capture() {
             -c:v hevc_qsv \
             -preset fast \
             -global_quality 28 \
-            -y "$output" &>/dev/null
+            -y "$output" 2>&1 | tee /tmp/basic_capture_test.log | tail -20
     fi
     
     if [[ -f "$output" ]]; then
         local size=$(du -h "$output" | cut -f1)
         log "Basic capture test PASSED - File size: $size"
+        log "Full log saved to: /tmp/basic_capture_test.log"
         return 0
     else
         error "Basic capture test FAILED"
+        error "Check log at: /tmp/basic_capture_test.log"
+        cat /tmp/basic_capture_test.log
         return 1
     fi
 }
@@ -112,9 +118,11 @@ test_qsv_encode() {
     export LIBVA_DRIVER_NAME=iHD
     
     local format=$(detect_best_format "$device")
+    log "Using format: $format with QSV acceleration"
     
     if [[ "$format" == "h264" ]]; then
         # H264 input - decode with QSV and re-encode to HEVC
+        log "Command: $FFMPEG -f v4l2 -input_format h264 -video_size 1920x1080 -framerate 30 -i $device -c:v hevc_qsv -preset medium -global_quality 28"
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format h264 \
@@ -124,8 +132,9 @@ test_qsv_encode() {
             -c:v hevc_qsv \
             -preset medium \
             -global_quality 28 \
-            -y "$output" 2>/tmp/qsv_test.log
+            -y "$output" 2>&1 | tee /tmp/qsv_test.log | tail -20
     elif [[ "$format" == "mjpeg" ]]; then
+        log "Command: $FFMPEG -f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30 -i $device [QSV pipeline] -c:v hevc_qsv"
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format mjpeg \
@@ -139,8 +148,9 @@ test_qsv_encode() {
             -preset medium \
             -global_quality 28 \
             -look_ahead 1 \
-            -y "$output" 2>/tmp/qsv_test.log
+            -y "$output" 2>&1 | tee /tmp/qsv_test.log | tail -20
     else
+        log "Command: $FFMPEG -f v4l2 -video_size 1920x1080 -framerate 30 -i $device [QSV pipeline] -c:v hevc_qsv"
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -video_size 1920x1080 \
@@ -153,7 +163,7 @@ test_qsv_encode() {
             -preset medium \
             -global_quality 28 \
             -look_ahead 1 \
-            -y "$output" 2>/tmp/qsv_test.log
+            -y "$output" 2>&1 | tee /tmp/qsv_test.log | tail -20
     fi
     
     if [[ -f "$output" ]]; then
@@ -166,9 +176,11 @@ test_qsv_encode() {
         else
             warn "Hardware acceleration may not be active"
         fi
+        log "Full log saved to: /tmp/qsv_test.log"
         return 0
     else
         error "QSV encoding test FAILED"
+        error "Check log at: /tmp/qsv_test.log"
         cat /tmp/qsv_test.log
         return 1
     fi
@@ -183,9 +195,11 @@ test_4k_qsv() {
     export LIBVA_DRIVER_NAME=iHD
     
     local format=$(detect_best_format "$device")
+    log "Using format: $format for 4K capture with QSV"
     
     if [[ "$format" == "h264" ]]; then
         # H264 input at 4K - decode and re-encode to HEVC with QSV
+        log "Command: $FFMPEG -f v4l2 -input_format h264 -video_size 3840x2160 -framerate 30 -i $device -c:v hevc_qsv -preset medium -global_quality 28"
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format h264 \
@@ -195,8 +209,9 @@ test_4k_qsv() {
             -c:v hevc_qsv \
             -preset medium \
             -global_quality 28 \
-            -y "$output" 2>/tmp/4k_qsv_test.log
+            -y "$output" 2>&1 | tee /tmp/4k_qsv_test.log | tail -20
     elif [[ "$format" == "mjpeg" ]]; then
+        log "Command: $FFMPEG -f v4l2 -input_format mjpeg -video_size 3840x2160 -framerate 15 -i $device [QSV pipeline] -c:v hevc_qsv"
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format mjpeg \
@@ -210,8 +225,9 @@ test_4k_qsv() {
             -preset medium \
             -global_quality 28 \
             -look_ahead 1 \
-            -y "$output" 2>/tmp/4k_qsv_test.log
+            -y "$output" 2>&1 | tee /tmp/4k_qsv_test.log | tail -20
     else
+        log "Command: $FFMPEG -f v4l2 -video_size 3840x2160 -framerate 15 -i $device [QSV pipeline] -c:v hevc_qsv"
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -video_size 3840x2160 \
@@ -224,15 +240,17 @@ test_4k_qsv() {
             -preset medium \
             -global_quality 28 \
             -look_ahead 1 \
-            -y "$output" 2>/tmp/4k_qsv_test.log
+            -y "$output" 2>&1 | tee /tmp/4k_qsv_test.log | tail -20
     fi
     
     if [[ -f "$output" ]]; then
         local size=$(du -h "$output" | cut -f1)
         log "4K QSV encoding test PASSED - File size: $size"
+        log "Full log saved to: /tmp/4k_qsv_test.log"
         return 0
     else
         error "4K QSV encoding test FAILED"
+        error "Check log at: /tmp/4k_qsv_test.log"
         cat /tmp/4k_qsv_test.log
         return 1
     fi
@@ -248,6 +266,9 @@ benchmark_performance() {
     
     local cam1_format=$(detect_best_format "/dev/video0")
     local cam2_format=$(detect_best_format "/dev/video2")
+    
+    log "Camera 1 format: $cam1_format"
+    log "Camera 2 format: $cam2_format"
     
     # Build FFmpeg command based on detected formats
     local cam1_input=""
@@ -269,6 +290,9 @@ benchmark_performance() {
         cam2_input="-f v4l2 -video_size 1920x1080 -framerate 30 -i /dev/video2"
     fi
     
+    log "Starting dual camera benchmark (30 seconds)..."
+    log "Command: $FFMPEG $cam1_input $cam2_input -map 0:v -c:v hevc_qsv ... -map 1:v -c:v hevc_qsv ..."
+    
     # Record for 30 seconds from both cameras
     "$FFMPEG" \
         $cam1_input \
@@ -278,11 +302,12 @@ benchmark_performance() {
         -t 30 \
         -y "$TEST_DIR/dual_test_cam1.mp4" \
         -y "$TEST_DIR/dual_test_cam2.mp4" \
-        2>/tmp/benchmark.log &
+        2>&1 | tee /tmp/benchmark.log | tail -30 &
     
     local ffmpeg_pid=$!
     
     # Monitor CPU usage during test
+    log "Monitoring CPU usage..."
     local max_cpu=0
     for i in {1..30}; do
         sleep 1
@@ -290,7 +315,9 @@ benchmark_performance() {
         if (( $(echo "$current_cpu > $max_cpu" | bc -l) )); then
             max_cpu=$current_cpu
         fi
+        echo -n "."
     done
+    echo
     
     wait $ffmpeg_pid
     local end_time=$(date +%s)
@@ -298,6 +325,7 @@ benchmark_performance() {
     
     log "Benchmark completed in ${duration}s"
     log "Peak CPU usage: ${max_cpu}%"
+    log "Full log saved to: /tmp/benchmark.log"
     
     if [[ -f "$TEST_DIR/dual_test_cam1.mp4" && -f "$TEST_DIR/dual_test_cam2.mp4" ]]; then
         local size1=$(du -h "$TEST_DIR/dual_test_cam1.mp4" | cut -f1)
@@ -305,6 +333,7 @@ benchmark_performance() {
         log "Dual camera test PASSED - Cam1: $size1, Cam2: $size2"
     else
         error "Dual camera test FAILED"
+        error "Check log at: /tmp/benchmark.log"
     fi
 }
 
