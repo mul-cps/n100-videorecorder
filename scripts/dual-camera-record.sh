@@ -92,6 +92,8 @@ if [[ "$CAMERA1_FORMAT" == "h264" ]]; then
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
+        -segment_format_options movflags=+faststart+frag_keyframe \
+        -flush_packets 0 \
         -reset_timestamps 1 \
         -strftime 1 \
         "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
@@ -114,6 +116,8 @@ elif [[ "$CAMERA1_FORMAT" == "mjpeg" ]]; then
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
+        -segment_format_options movflags=+faststart+frag_keyframe \
+        -flush_packets 0 \
         -reset_timestamps 1 \
         -strftime 1 \
         "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
@@ -135,6 +139,8 @@ else
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
+        -segment_format_options movflags=+faststart+frag_keyframe \
+        -flush_packets 0 \
         -reset_timestamps 1 \
         -strftime 1 \
         "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
@@ -162,6 +168,8 @@ if [[ "$CAMERA2_FORMAT" == "h264" ]]; then
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
+        -segment_format_options movflags=+faststart+frag_keyframe \
+        -flush_packets 0 \
         -reset_timestamps 1 \
         -strftime 1 \
         "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \
@@ -184,6 +192,8 @@ elif [[ "$CAMERA2_FORMAT" == "mjpeg" ]]; then
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
+        -segment_format_options movflags=+faststart+frag_keyframe \
+        -flush_packets 0 \
         -reset_timestamps 1 \
         -strftime 1 \
         "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \
@@ -205,6 +215,8 @@ else
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
+        -segment_format_options movflags=+faststart+frag_keyframe \
+        -flush_packets 0 \
         -reset_timestamps 1 \
         -strftime 1 \
         "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \

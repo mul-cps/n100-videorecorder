@@ -1,0 +1,27 @@
+[Unit]
+Description=Camera Recorder Web Interface
+After=network.target dual-camera-record.service
+Wants=dual-camera-record.service
+
+[Service]
+Type=simple
+User=bjoern
+Group=bjoern
+WorkingDirectory=/home/bjoern/git/n100-videorecorder
+ExecStart=/usr/bin/python3 /home/bjoern/git/n100-videorecorder/scripts/web-interface.py
+
+# Restart configuration
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=camera-web-interface
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
