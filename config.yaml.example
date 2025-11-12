@@ -1,0 +1,68 @@
+# Camera Recorder Configuration
+# YAML format for sophisticated Python implementation
+
+# Camera configurations
+cameras:
+  cam1:
+    device: "/dev/video-usb1-video0"  # Or /dev/video0
+    name: "Primary Camera"
+    resolution: "2560x1440"
+    framerate: 60
+    input_format: "h264"  # h264, mjpeg, yuyv
+    enabled: true
+  
+  cam2:
+    device: "/dev/video-usb2-video3"  # Or /dev/video2
+    name: "Secondary Camera"
+    resolution: "2560x1440"
+    framerate: 60
+    input_format: "h264"
+    enabled: true
+
+# Encoding settings
+encoding:
+  codec: "copy"  # copy (no transcoding), hevc_qsv, h264_qsv
+  preset: "fast"  # veryfast, fast, medium, slow, veryslow
+  quality: 23  # 18-32, lower = better quality
+  bitrate_mode: "VBR"  # VBR, CBR, CQP
+  target_bitrate: 8000  # kbps
+  max_bitrate: 12000  # kbps
+  gop_size: 60  # Group of pictures size (frames)
+  ref_frames: 3  # Reference frames for motion estimation
+  lookahead: true  # Enable lookahead for better quality
+  extra_hw_frames: 64  # Extra hardware frames for QSV
+
+# Recording settings
+recording:
+  segment_time: 1800  # Segment length in seconds (1800 = 30 minutes)
+  container_format: "mp4"  # mp4, mkv
+  base_directory: "/storage/recordings"
+  flush_packets: false  # Buffer writes for reduced I/O
+  movflags: "faststart+frag_keyframe"  # MP4 optimization flags
+
+# Storage management
+storage:
+  cleanup_enabled: true
+  cleanup_days: 30  # Keep recordings for 30 days
+  disk_usage_threshold: 95  # Stop recording when disk exceeds this %
+  low_space_warning: 85  # Warn when disk exceeds this %
+
+# Background transcoding (H.264 → H.265 for space savings)
+transcoding:
+  enabled: false  # Enable background transcoding
+  min_age_days: 7  # Only transcode files older than this
+  run_schedule_start: "02:00"  # Start time (HH:MM)
+  run_schedule_end: "06:00"  # End time (HH:MM)
+  max_cpu_percent: 15.0  # Pause if CPU usage exceeds this
+  max_io_wait: 5.0  # Pause if I/O wait exceeds this
+  codec: "hevc_qsv"  # Transcoding codec (hevc_qsv recommended)
+  preset: "medium"  # Slower = better compression (medium recommended)
+  quality: 23  # Quality (18-28, lower = better, 23 recommended)
+  keep_original_days: 1  # Keep original file for N days after transcoding
+  min_free_space_gb: 100  # Don't transcode if free space below this
+  min_savings_percent: 10.0  # Skip if space savings < this percent
+  verify_quality: true  # Verify transcoded file before deleting original
+
+# System settings
+vaapi_driver: "iHD"  # Intel VA-API driver (iHD for N100)
+log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR

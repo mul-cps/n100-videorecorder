@@ -1,0 +1,59 @@
+[Unit]
+Description=Camera Recorder Service (Python)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=bjoern
+Group=video
+WorkingDirectory=/home/bjoern/git/n100-videorecorder
+Environment="LIBVA_DRIVER_NAME=iHD"
+Environment="PYTHONUNBUFFERED=1"
+
+# Wait for cameras to be ready
+ExecStartPre=/bin/sleep 5
+ExecStartPre=/bin/bash -c 'for i in {1..30}; do [ -c /dev/video0 ] || [ -L /dev/video-usb1-video0 ] && break; sleep 2; done'
+
+# Main recording command
+ExecStart=/usr/bin/python3 -m camera_recorder.main --config /etc/camera-recorder/config.yaml
+
+# Graceful shutdown
+KillSignal=SIGINT
+TimeoutStopSec=20
+KillMode=mixed
+
+# Restart configuration
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=camera-recorder
+
+# Security and permissions
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectKernelModules=false
+RestrictRealtime=true
+
+# Device access
+DeviceAllow=/dev/dri/renderD128 rw
+DeviceAllow=/dev/dri/card0 rw
+DeviceAllow=/dev/video0 rw
+DeviceAllow=/dev/video1 rw
+DeviceAllow=/dev/video2 rw
+DeviceAllow=/dev/video3 rw
+SupplementaryGroups=video render
+
+# Resource limits
+LimitNOFILE=4096
+OOMScoreAdjust=-100
+
+[Install]
+WantedBy=multi-user.target

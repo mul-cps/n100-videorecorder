@@ -23,14 +23,14 @@ sudo apt update && sudo apt upgrade -y
 git clone <your-repo-url> /home/$(whoami)/n100-videorecorder
 cd /home/$(whoami)/n100-videorecorder
 
-# Run automated deployment
+# Run automated deployment (installs dependencies, drivers, etc.)
 sudo ./deploy.sh
 ```
 
 ### 2. Configure Network
 
 ```bash
-# Set up WiFi
+# Set up WiFi (if needed)
 sudo ./scripts/setup-wifi.sh
 
 # Edit WiFi credentials
@@ -40,56 +40,104 @@ sudo nano /etc/netplan/50-wifi.yaml
 sudo netplan apply
 ```
 
-### 3. Set Up Cameras
+### 3. Detect and Configure Cameras
 
 ```bash
-# Detect and configure cameras
-sudo ./scripts/camera-setup.sh
+# Detect available cameras and their capabilities
+sudo ./scripts/detect-cameras.sh
 
-# Test camera functionality
-sudo ./scripts/camera-test.sh
-
-# Verify QSV support
-sudo ./scripts/test-qsv.sh
+# Configure camera mapping based on detection
+sudo nano /etc/camera-recorder/camera-mapping.conf
 ```
 
-### 4. Start Recording
+**Important**: Update the camera device paths to match your system:
+- Check output from `detect-cameras.sh`
+- Use persistent symlinks like `/dev/video-usb1-video0` (preferred)
+- Or use direct devices like `/dev/video0`, `/dev/video2`
+
+### 4. Update and Install Service
 
 ```bash
+# Edit service file to use YOUR username (currently set to 'bjoern')
+sudo nano systemd/dual-camera-record.service
+# Change: User=bjoern to User=yourusername
+
+# Copy service file to systemd
+sudo cp systemd/dual-camera-record.service /etc/systemd/system/
+
+# Reload systemd and enable service
+sudo systemctl daemon-reload
+sudo systemctl enable dual-camera-record
+```
+
+### 5. Verify and Start
+
+```bash
+# Run verification tests
+sudo ./verify-setup.sh
+
 # Start recording service
 sudo systemctl start dual-camera-record
 
-# Enable auto-start
-sudo systemctl enable dual-camera-record
-
 # Check status
 sudo systemctl status dual-camera-record
+
+# Monitor logs in real-time
+journalctl -u dual-camera-record -f
 ```
 
 ## Manual Configuration
 
 ### Camera Device Mapping
 
-If cameras don't map correctly to `/dev/video0` and `/dev/video2`, you may need to:
+The system uses **persistent symlinks** created by udev rules to ensure cameras maintain consistent device assignments.
 
-1. **Identify your cameras:**
+1. **Check current camera devices:**
+   ```bash
+   ls -la /dev/video*
+   # Look for symlinks like: /dev/video-usb1-video0 -> video0
+   ```
+
+2. **Detect cameras and their USB positions:**
+   ```bash
+   sudo ./scripts/detect-cameras.sh
+   ```
+
+3. **Update configuration:**
+   ```bash
+   sudo nano /etc/camera-recorder/camera-mapping.conf
+   ```
+
+4. **Example configurations:**
+   
+   **Using persistent symlinks (recommended):**
+   ```bash
+   CAMERA1_DEVICE="/dev/video-usb1-video0"
+   CAMERA2_DEVICE="/dev/video-usb2-video3"
+   ```
+   
+   **Using direct device nodes (less reliable):**
+   ```bash
+   CAMERA1_DEVICE="/dev/video0"
+   CAMERA2_DEVICE="/dev/video2"
+   ```
+
+5. **Custom udev rules (advanced):**
+   
+   Get camera vendor/product IDs:
    ```bash
    lsusb
-   v4l2-ctl --list-devices
-   ```
-
-2. **Create custom udev rules:**
-   ```bash
-   # Get camera details
    udevadm info -a -p $(udevadm info -q path -n /dev/video0)
+   ```
    
-   # Edit udev rules
+   Edit udev rules:
+   ```bash
    sudo nano /etc/udev/rules.d/99-camera-mapping.rules
    ```
-
-3. **Example udev rule:**
+   
+   Add camera-specific rules:
    ```
-   SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="636d", SYMLINK+="video-cam1"
+   SUBSYSTEM=="video4linux", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="YYYY", SYMLINK+="camera-primary"
    ```
 
 ### Storage Configuration
@@ -116,16 +164,82 @@ The system stores recordings in `/storage/recordings/` by default. To use a diff
 
 Adjust encoding quality in `/etc/camera-recorder/camera-mapping.conf`:
 
-- **Higher quality (larger files):** `ENCODING_QUALITY="22"`
-- **Balanced (default):** `ENCODING_QUALITY="28"`
-- **Smaller files:** `ENCODING_QUALITY="32"`
+**Current Settings (Optimized for Fast Motion/Conveyor Belt):**
+```bash
+ENCODING_PRESET="fast"          # Fast preset for better motion handling
+ENCODING_QUALITY="23"           # High quality (lower = better, 18-32 range)
+BITRATE_MODE="VBR"              # Variable bitrate for consistent quality
+TARGET_BITRATE="8000"           # 8 Mbps target
+MAX_BITRATE="12000"             # 12 Mbps maximum
+GOP_SIZE="60"                   # 1 keyframe per second at 60fps
+```
+
+**For Different Use Cases:**
+
+- **Stream Copy (No Transcoding - Current Default):**
+  ```bash
+  ENCODING_CODEC="copy"
+  # Fastest, zero quality loss, minimal CPU usage
+  ```
+
+- **Higher quality (larger files):**
+  ```bash
+  ENCODING_CODEC="hevc_qsv"
+  ENCODING_QUALITY="22"
+  TARGET_BITRATE="10000"
+  ```
+
+- **Balanced (medium quality, smaller files):**
+  ```bash
+  ENCODING_QUALITY="28"
+  TARGET_BITRATE="5000"
+  ```
+
+- **Maximum compression (smaller files, lower quality):**
+  ```bash
+  ENCODING_QUALITY="32"
+  ENCODING_PRESET="fast"
+  TARGET_BITRATE="3000"
+  ```
 
 ### Resolution Settings
 
-For different resolutions, modify:
+Current default is 1440p (2560x1440) at 60fps. To change:
+
 ```bash
-CAMERA1_RESOLUTION="1920x1080"  # 1080p
-CAMERA2_RESOLUTION="2560x1440"  # 1440p
+sudo nano /etc/camera-recorder/camera-mapping.conf
+```
+
+**Common resolutions:**
+```bash
+# 4K UHD
+CAMERA1_RESOLUTION="3840x2160"
+
+# 1440p (current default)
+CAMERA1_RESOLUTION="2560x1440"
+
+# 1080p Full HD
+CAMERA1_RESOLUTION="1920x1080"
+
+# 720p HD
+CAMERA1_RESOLUTION="1280x720"
+```
+
+**Frame rate options:**
+```bash
+# High motion (current default)
+CAMERA1_FRAMERATE="60"
+
+# Standard
+CAMERA1_FRAMERATE="30"
+
+# Low bandwidth
+CAMERA1_FRAMERATE="15"
+```
+
+**Important**: Verify your camera supports the resolution and frame rate:
+```bash
+v4l2-ctl --device=/dev/video0 --list-formats-ext
 ```
 
 ## Remote Management
@@ -181,14 +295,24 @@ To enable a simple web interface for log viewing:
 # Overall system status
 sudo ./scripts/check-cameras.sh
 
-# View recording logs
+# View recording logs (recommended)
 journalctl -u dual-camera-record -f
+
+# View camera-specific logs (if they exist)
+tail -f /var/log/camera-recorder/camera1-qsv.log
+tail -f /var/log/camera-recorder/camera2-qsv.log
+tail -f /var/log/camera-recorder/dual-camera.log
 
 # Check disk usage
 df -h /storage/recordings
 
 # View recent recordings
-ls -la /storage/recordings/cam1/ | tail -5
+ls -lah /storage/recordings/cam1/ | tail -10
+ls -lah /storage/recordings/cam2/ | tail -10
+
+# Count recordings by camera
+find /storage/recordings/cam1 -name "*.mp4" | wc -l
+find /storage/recordings/cam2 -name "*.mp4" | wc -l
 ```
 
 ### Performance Monitoring
@@ -220,30 +344,68 @@ sensors
 lsusb
 dmesg | grep uvc
 
-# Test camera manually
-v4l2-ctl --list-devices
+# List all video devices
+ls -la /dev/video*
+
+# Test camera detection
+sudo ./scripts/detect-cameras.sh
+
+# Check if udev symlinks exist
+ls -la /dev/video-usb*
 ```
 
-**2. QSV not working:**
+**2. Recording service fails to start:**
+```bash
+# Check service status and errors
+systemctl status dual-camera-record
+journalctl -u dual-camera-record --since "10 minutes ago" --no-pager
+
+# Verify camera devices in config match actual devices
+cat /etc/camera-recorder/camera-mapping.conf | grep CAMERA._DEVICE
+ls -la /dev/video*
+
+# Test manual recording
+sudo /home/$(whoami)/git/n100-videorecorder/scripts/dual-camera-record.sh
+
+# Check camera permissions
+groups | grep -E "video|render"
+```
+
+**3. QSV not working (if using hardware encoding):**
 ```bash
 # Check Intel GPU
-lspci | grep Intel
+lspci | grep -i intel
 vainfo
 
 # Test QSV encoding
 sudo ./scripts/test-qsv.sh
+
+# Verify FFmpeg has QSV support
+/usr/lib/jellyfin-ffmpeg/ffmpeg -encoders 2>&1 | grep qsv
 ```
 
-**3. Recording service fails:**
+**4. Camera streams show errors:**
 ```bash
-# Check service status
-systemctl status dual-camera-record
+# Test camera directly with FFmpeg
+ffmpeg -f v4l2 -input_format h264 -video_size 1920x1080 -i /dev/video0 -t 5 test.mp4
 
-# View error logs
-journalctl -u dual-camera-record --since "1 hour ago"
+# Check USB bandwidth (if multiple cameras on same bus)
+sudo ./scripts/usb-bandwidth-test.sh
 
-# Test manual recording
-sudo /usr/local/bin/dual-camera-record.sh
+# Verify camera format support
+v4l2-ctl --device=/dev/video0 --list-formats-ext
+```
+
+**5. High CPU usage:**
+```bash
+# Check if stream copy mode is enabled (should be for H.264 cameras)
+cat /etc/camera-recorder/camera-mapping.conf | grep ENCODING_CODEC
+
+# If using QSV encoding, verify hardware acceleration is active
+journalctl -u dual-camera-record | grep -i "qsv\|hwaccel"
+
+# Monitor FFmpeg processes
+top -p $(pgrep -d',' ffmpeg)
 ```
 
 **4. Disk space issues:**
@@ -262,12 +424,21 @@ sudo nano /etc/camera-recorder/camera-mapping.conf
 
 **Service won't start:**
 ```bash
-# Reset service
+# Reset service completely
 sudo systemctl stop dual-camera-record
 sudo systemctl disable dual-camera-record
+
+# Verify service file is correct
+sudo nano /etc/systemd/system/dual-camera-record.service
+# Check: User matches your username, ExecStart path is correct
+
+# Reload and re-enable
 sudo systemctl daemon-reload
 sudo systemctl enable dual-camera-record
 sudo systemctl start dual-camera-record
+
+# Monitor startup
+journalctl -u dual-camera-record -f
 ```
 
 **Corrupted recordings:**
@@ -275,8 +446,24 @@ sudo systemctl start dual-camera-record
 # Check file integrity
 find /storage/recordings -name "*.mp4" -exec ffprobe {} \; 2>&1 | grep -i error
 
-# Remove corrupted files
-find /storage/recordings -name "*.mp4" -size -1M -delete
+# Remove small/corrupted files (less than 100KB)
+find /storage/recordings -name "*.mp4" -size -100k -delete
+
+# Verify disk is not full
+df -h /storage/recordings
+```
+
+**Permission issues:**
+```bash
+# Fix ownership of recordings directory
+sudo chown -R $USER:$USER /storage/recordings
+
+# Ensure user is in video/render groups
+sudo usermod -a -G video,render $USER
+# Log out and back in for group changes to take effect
+
+# Fix script permissions
+chmod +x /home/$(whoami)/git/n100-videorecorder/scripts/*.sh
 ```
 
 ## Performance Optimization
