@@ -101,6 +101,8 @@ if [[ "$CAMERA1_FORMAT" == "h264" ]]; then
         -g "$GOP_SIZE" \
         -refs "$REF_FRAMES" \
         -bf 3 \
+        -vsync vfr \
+        -fps_mode passthrough \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
@@ -193,6 +195,8 @@ if [[ "$CAMERA2_FORMAT" == "h264" ]]; then
         -g "$GOP_SIZE" \
         -refs "$REF_FRAMES" \
         -bf 3 \
+        -vsync vfr \
+        -fps_mode passthrough \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
