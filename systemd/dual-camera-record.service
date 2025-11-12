@@ -1,17 +1,15 @@
 [Unit]
 Description=Dual 4K Camera QSV Recording Service
-After=network.target graphical-session.target
+After=network.target
 Wants=network.target
-Requires=graphical-session.target
 
 [Service]
 Type=simple
-User=youruser
+User=bjoern
 Group=video
-WorkingDirectory=/home/youruser
+WorkingDirectory=/home/bjoern
 Environment="LIBVA_DRIVER_NAME=iHD"
 Environment="GST_VAAPI_ALL_DRIVERS=1"
-Environment="DISPLAY=:0"
 
 # Wait for cameras to be ready
 ExecStartPre=/bin/sleep 15
@@ -19,7 +17,7 @@ ExecStartPre=/usr/bin/modprobe uvcvideo
 ExecStartPre=/bin/bash -c 'while [ ! -c /dev/video0 ] || [ ! -c /dev/video2 ]; do sleep 2; done'
 
 # Main recording command
-ExecStart=/usr/local/bin/dual-camera-record.sh
+ExecStart=/home/bjoern/git/n100-videorecorder/scripts/dual-camera-record.sh
 
 # Graceful shutdown
 ExecStop=/bin/kill -TERM $MAINPID
