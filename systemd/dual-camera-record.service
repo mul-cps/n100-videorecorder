@@ -12,8 +12,7 @@ Environment="LIBVA_DRIVER_NAME=iHD"
 Environment="GST_VAAPI_ALL_DRIVERS=1"
 
 # Wait for cameras to be ready
-ExecStartPre=/bin/sleep 15
-ExecStartPre=/usr/bin/modprobe uvcvideo
+ExecStartPre=/bin/sleep 5
 ExecStartPre=/bin/bash -c 'while [ ! -c /dev/video0 ] || [ ! -c /dev/video2 ]; do sleep 2; done'
 
 # Main recording command
