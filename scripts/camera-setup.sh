@@ -208,7 +208,7 @@ test_4k_capability() {
             log "Best format for $device: $format"
             
             # Test if device supports 4K in detected format
-            if v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -A10 "$format" | grep -q "3840x2160"; then
+            if v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -A10 "$(echo $format | tr '[:lower:]' '[:upper:]')" | grep -q "3840x2160"; then
                 log "$device supports 4K in $format format - GOOD!"
                 
                 # Quick test capture based on format

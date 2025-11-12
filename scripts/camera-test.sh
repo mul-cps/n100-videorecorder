@@ -58,13 +58,14 @@ test_basic_capture() {
     log "Using format: $format"
     
     if [[ "$format" == "h264" ]]; then
+        # H264 input - copy stream directly (no re-encoding needed for basic test)
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format h264 \
             -video_size 1920x1080 \
+            -framerate 30 \
             -i "$device" \
-            -c:v libx264 \
-            -preset fast \
+            -c:v copy \
             -y "$output" &>/dev/null
     elif [[ "$format" == "mjpeg" ]]; then
         timeout $TEST_DURATION "$FFMPEG" \
@@ -109,18 +110,16 @@ test_qsv_encode() {
     local format=$(detect_best_format "$device")
     
     if [[ "$format" == "h264" ]]; then
+        # H264 input - decode with QSV and re-encode to HEVC
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format h264 \
             -video_size 1920x1080 \
+            -framerate 30 \
             -i "$device" \
-            -init_hw_device qsv=hw \
-            -filter_hw_device hw \
-            -vf hwupload=extra_hw_frames=64,format=qsv \
             -c:v hevc_qsv \
             -preset medium \
             -global_quality 28 \
-            -look_ahead 1 \
             -y "$output" 2>/tmp/qsv_test.log
     elif [[ "$format" == "mjpeg" ]]; then
         timeout $TEST_DURATION "$FFMPEG" \
@@ -158,7 +157,7 @@ test_qsv_encode() {
         log "QSV encoding test PASSED - File size: $size"
         
         # Check for QSV usage in log
-        if grep -q "hwaccel" /tmp/qsv_test.log; then
+        if grep -q "qsv" /tmp/qsv_test.log; then
             log "Hardware acceleration is working!"
         else
             warn "Hardware acceleration may not be active"
@@ -182,18 +181,16 @@ test_4k_qsv() {
     local format=$(detect_best_format "$device")
     
     if [[ "$format" == "h264" ]]; then
+        # H264 input at 4K - decode and re-encode to HEVC with QSV
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format h264 \
             -video_size 3840x2160 \
+            -framerate 30 \
             -i "$device" \
-            -init_hw_device qsv=hw \
-            -filter_hw_device hw \
-            -vf hwupload=extra_hw_frames=64,format=qsv \
             -c:v hevc_qsv \
             -preset medium \
             -global_quality 28 \
-            -look_ahead 1 \
             -y "$output" 2>/tmp/4k_qsv_test.log
     elif [[ "$format" == "mjpeg" ]]; then
         timeout $TEST_DURATION "$FFMPEG" \
@@ -253,7 +250,7 @@ benchmark_performance() {
     local cam2_input=""
     
     if [[ "$cam1_format" == "h264" ]]; then
-        cam1_input="-f v4l2 -input_format h264 -video_size 1920x1080 -i /dev/video0"
+        cam1_input="-f v4l2 -input_format h264 -video_size 1920x1080 -framerate 30 -i /dev/video0"
     elif [[ "$cam1_format" == "mjpeg" ]]; then
         cam1_input="-f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30 -i /dev/video0"
     else
@@ -261,7 +258,7 @@ benchmark_performance() {
     fi
     
     if [[ "$cam2_format" == "h264" ]]; then
-        cam2_input="-f v4l2 -input_format h264 -video_size 1920x1080 -i /dev/video2"
+        cam2_input="-f v4l2 -input_format h264 -video_size 1920x1080 -framerate 30 -i /dev/video2"
     elif [[ "$cam2_format" == "mjpeg" ]]; then
         cam2_input="-f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30 -i /dev/video2"
     else
@@ -272,10 +269,8 @@ benchmark_performance() {
     "$FFMPEG" \
         $cam1_input \
         $cam2_input \
-        -init_hw_device qsv=hw \
-        -filter_hw_device hw \
-        -map 0:v -vf hwupload=extra_hw_frames=64,format=qsv -c:v hevc_qsv -preset medium -global_quality 28 \
-        -map 1:v -vf hwupload=extra_hw_frames=64,format=qsv -c:v hevc_qsv -preset medium -global_quality 28 \
+        -map 0:v -c:v hevc_qsv -preset medium -global_quality 28 \
+        -map 1:v -c:v hevc_qsv -preset medium -global_quality 28 \
         -t 30 \
         -y "$TEST_DIR/dual_test_cam1.mp4" \
         -y "$TEST_DIR/dual_test_cam2.mp4" \

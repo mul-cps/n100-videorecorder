@@ -79,19 +79,16 @@ log "Starting Camera 1 recording process..."
 
 # Build FFmpeg command based on input format
 if [[ "$CAMERA1_FORMAT" == "h264" ]]; then
-    # H264 input - decode and re-encode with QSV
+    # H264 input - decode and re-encode with QSV (simpler approach without hwupload filters)
     "$FFMPEG" \
         -f v4l2 \
         -input_format h264 \
         -video_size "$CAMERA1_RESOLUTION" \
+        -framerate "$CAMERA1_FRAMERATE" \
         -i "$CAMERA1_DEVICE" \
-        -init_hw_device qsv=hw \
-        -filter_hw_device hw \
-        -vf hwupload=extra_hw_frames=64,format=qsv \
         -c:v hevc_qsv \
         -preset "$ENCODING_PRESET" \
         -global_quality "$ENCODING_QUALITY" \
-        -look_ahead 1 \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
@@ -152,19 +149,16 @@ log "Starting Camera 2 recording process..."
 
 # Build FFmpeg command based on input format
 if [[ "$CAMERA2_FORMAT" == "h264" ]]; then
-    # H264 input - decode and re-encode with QSV
+    # H264 input - decode and re-encode with QSV (simpler approach without hwupload filters)
     "$FFMPEG" \
         -f v4l2 \
         -input_format h264 \
         -video_size "$CAMERA2_RESOLUTION" \
+        -framerate "$CAMERA2_FRAMERATE" \
         -i "$CAMERA2_DEVICE" \
-        -init_hw_device qsv=hw \
-        -filter_hw_device hw \
-        -vf hwupload=extra_hw_frames=64,format=qsv \
         -c:v hevc_qsv \
         -preset "$ENCODING_PRESET" \
         -global_quality "$ENCODING_QUALITY" \
-        -look_ahead 1 \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
