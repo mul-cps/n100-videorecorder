@@ -60,7 +60,7 @@ test_basic_capture() {
     if [[ "$format" == "h264" ]]; then
         # H264 input - re-encode to HEVC with QSV for space savings
         log "Command: $FFMPEG -f v4l2 -input_format h264 -video_size 1920x1080 -framerate 30 -i $device -c:v hevc_qsv -preset fast -global_quality 28 -t $TEST_DURATION -y $output"
-        timeout $TEST_DURATION "$FFMPEG" \
+        timeout $((TEST_DURATION + 15)) "$FFMPEG" \
             -f v4l2 \
             -input_format h264 \
             -video_size 1920x1080 \
@@ -73,7 +73,7 @@ test_basic_capture() {
             -y "$output" 2>&1 | tee /tmp/basic_capture_test.log | tail -20
     elif [[ "$format" == "mjpeg" ]]; then
         log "Command: $FFMPEG -f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30 -i $device -c:v hevc_qsv -preset fast -global_quality 28 -t $TEST_DURATION -y $output"
-        timeout $TEST_DURATION "$FFMPEG" \
+        timeout $((TEST_DURATION + 15)) "$FFMPEG" \
             -f v4l2 \
             -input_format mjpeg \
             -video_size 1920x1080 \
@@ -86,7 +86,7 @@ test_basic_capture() {
             -y "$output" 2>&1 | tee /tmp/basic_capture_test.log | tail -20
     else
         log "Command: $FFMPEG -f v4l2 -video_size 1920x1080 -framerate 30 -i $device -c:v hevc_qsv -preset fast -global_quality 28 -t $TEST_DURATION -y $output"
-        timeout $TEST_DURATION "$FFMPEG" \
+        timeout $((TEST_DURATION + 15)) "$FFMPEG" \
             -f v4l2 \
             -video_size 1920x1080 \
             -framerate 30 \
@@ -126,7 +126,7 @@ test_qsv_encode() {
     if [[ "$format" == "h264" ]]; then
         # H264 input - decode with QSV and re-encode to HEVC
         log "Command: $FFMPEG -f v4l2 -input_format h264 -video_size 1920x1080 -framerate 30 -i $device -c:v hevc_qsv -preset medium -global_quality 28 -t $TEST_DURATION -y $output"
-        timeout $TEST_DURATION "$FFMPEG" \
+        timeout $((TEST_DURATION + 15)) "$FFMPEG" \
             -f v4l2 \
             -input_format h264 \
             -video_size 1920x1080 \
@@ -139,7 +139,7 @@ test_qsv_encode() {
             -y "$output" 2>&1 | tee /tmp/qsv_test.log | tail -20
     elif [[ "$format" == "mjpeg" ]]; then
         log "Command: $FFMPEG -f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30 -i $device -init_hw_device qsv=hw -filter_hw_device hw -vf hwupload=extra_hw_frames=64,format=qsv -c:v hevc_qsv -preset medium -global_quality 28 -look_ahead 1 -t $TEST_DURATION -y $output"
-        timeout $TEST_DURATION "$FFMPEG" \
+        timeout $((TEST_DURATION + 15)) "$FFMPEG" \
             -f v4l2 \
             -input_format mjpeg \
             -video_size 1920x1080 \
@@ -156,7 +156,7 @@ test_qsv_encode() {
             -y "$output" 2>&1 | tee /tmp/qsv_test.log | tail -20
     else
         log "Command: $FFMPEG -f v4l2 -video_size 1920x1080 -framerate 30 -i $device -init_hw_device qsv=hw -filter_hw_device hw -vf hwupload=extra_hw_frames=64,format=qsv -c:v hevc_qsv -preset medium -global_quality 28 -look_ahead 1 -t $TEST_DURATION -y $output"
-        timeout $TEST_DURATION "$FFMPEG" \
+        timeout $((TEST_DURATION + 15)) "$FFMPEG" \
             -f v4l2 \
             -video_size 1920x1080 \
             -framerate 30 \
