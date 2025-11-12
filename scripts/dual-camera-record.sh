@@ -19,6 +19,8 @@ CAMERA1_RESOLUTION="${CAMERA1_RESOLUTION:-3840x2160}"
 CAMERA2_RESOLUTION="${CAMERA2_RESOLUTION:-3840x2160}"
 CAMERA1_FRAMERATE="${CAMERA1_FRAMERATE:-30}"
 CAMERA2_FRAMERATE="${CAMERA2_FRAMERATE:-30}"
+CAMERA1_FORMAT="${CAMERA1_FORMAT:-h264}"
+CAMERA2_FORMAT="${CAMERA2_FORMAT:-h264}"
 ENCODING_PRESET="${ENCODING_PRESET:-medium}"
 ENCODING_QUALITY="${ENCODING_QUALITY:-28}"
 SEGMENT_TIME="${SEGMENT_TIME:-3600}"
@@ -26,7 +28,14 @@ RECORDINGS_BASE="${RECORDINGS_BASE:-/storage/recordings}"
 
 # Runtime variables
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+# Try to find the correct FFmpeg binary
+if [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg7" ]]; then
+    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg7"
+elif [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg6" ]]; then
+    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg6"
+else
+    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+fi
 LOG_DIR="/var/log/camera-recorder"
 
 # Colors for logging
@@ -67,52 +76,146 @@ log "Camera 2: $CAMERA2_DEVICE @ ${CAMERA2_RESOLUTION}@${CAMERA2_FRAMERATE}fps"
 
 # Camera 1 - QSV H.265 Recording
 log "Starting Camera 1 recording process..."
-"$FFMPEG" \
-    -f v4l2 \
-    -input_format mjpeg \
-    -video_size "$CAMERA1_RESOLUTION" \
-    -framerate "$CAMERA1_FRAMERATE" \
-    -i "$CAMERA1_DEVICE" \
-    -init_hw_device qsv=hw \
-    -filter_hw_device hw \
-    -vf hwupload=extra_hw_frames=64,format=qsv \
-    -c:v hevc_qsv \
-    -preset "$ENCODING_PRESET" \
-    -global_quality "$ENCODING_QUALITY" \
-    -look_ahead 1 \
-    -f segment \
-    -segment_time "$SEGMENT_TIME" \
-    -segment_format mp4 \
-    -reset_timestamps 1 \
-    -strftime 1 \
-    "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
-    2>&1 | tee -a "$LOG_DIR/camera1-qsv.log" &
+
+# Build FFmpeg command based on input format
+if [[ "$CAMERA1_FORMAT" == "h264" ]]; then
+    # H264 input - decode and re-encode with QSV
+    "$FFMPEG" \
+        -f v4l2 \
+        -input_format h264 \
+        -video_size "$CAMERA1_RESOLUTION" \
+        -i "$CAMERA1_DEVICE" \
+        -init_hw_device qsv=hw \
+        -filter_hw_device hw \
+        -vf hwupload=extra_hw_frames=64,format=qsv \
+        -c:v hevc_qsv \
+        -preset "$ENCODING_PRESET" \
+        -global_quality "$ENCODING_QUALITY" \
+        -look_ahead 1 \
+        -f segment \
+        -segment_time "$SEGMENT_TIME" \
+        -segment_format mp4 \
+        -reset_timestamps 1 \
+        -strftime 1 \
+        "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
+        2>&1 | tee -a "$LOG_DIR/camera1-qsv.log" &
+elif [[ "$CAMERA1_FORMAT" == "mjpeg" ]]; then
+    # MJPEG input
+    "$FFMPEG" \
+        -f v4l2 \
+        -input_format mjpeg \
+        -video_size "$CAMERA1_RESOLUTION" \
+        -framerate "$CAMERA1_FRAMERATE" \
+        -i "$CAMERA1_DEVICE" \
+        -init_hw_device qsv=hw \
+        -filter_hw_device hw \
+        -vf hwupload=extra_hw_frames=64,format=qsv \
+        -c:v hevc_qsv \
+        -preset "$ENCODING_PRESET" \
+        -global_quality "$ENCODING_QUALITY" \
+        -look_ahead 1 \
+        -f segment \
+        -segment_time "$SEGMENT_TIME" \
+        -segment_format mp4 \
+        -reset_timestamps 1 \
+        -strftime 1 \
+        "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
+        2>&1 | tee -a "$LOG_DIR/camera1-qsv.log" &
+else
+    # YUYV or other raw format
+    "$FFMPEG" \
+        -f v4l2 \
+        -video_size "$CAMERA1_RESOLUTION" \
+        -framerate "$CAMERA1_FRAMERATE" \
+        -i "$CAMERA1_DEVICE" \
+        -init_hw_device qsv=hw \
+        -filter_hw_device hw \
+        -vf hwupload=extra_hw_frames=64,format=qsv \
+        -c:v hevc_qsv \
+        -preset "$ENCODING_PRESET" \
+        -global_quality "$ENCODING_QUALITY" \
+        -look_ahead 1 \
+        -f segment \
+        -segment_time "$SEGMENT_TIME" \
+        -segment_format mp4 \
+        -reset_timestamps 1 \
+        -strftime 1 \
+        "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
+        2>&1 | tee -a "$LOG_DIR/camera1-qsv.log" &
+fi
 
 CAM1_PID=$!
 log "Camera 1 recording started with PID: $CAM1_PID"
 
 # Camera 2 - QSV H.265 Recording  
 log "Starting Camera 2 recording process..."
-"$FFMPEG" \
-    -f v4l2 \
-    -input_format mjpeg \
-    -video_size "$CAMERA2_RESOLUTION" \
-    -framerate "$CAMERA2_FRAMERATE" \
-    -i "$CAMERA2_DEVICE" \
-    -init_hw_device qsv=hw \
-    -filter_hw_device hw \
-    -vf hwupload=extra_hw_frames=64,format=qsv \
-    -c:v hevc_qsv \
-    -preset "$ENCODING_PRESET" \
-    -global_quality "$ENCODING_QUALITY" \
-    -look_ahead 1 \
-    -f segment \
-    -segment_time "$SEGMENT_TIME" \
-    -segment_format mp4 \
-    -reset_timestamps 1 \
-    -strftime 1 \
-    "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \
-    2>&1 | tee -a "$LOG_DIR/camera2-qsv.log" &
+
+# Build FFmpeg command based on input format
+if [[ "$CAMERA2_FORMAT" == "h264" ]]; then
+    # H264 input - decode and re-encode with QSV
+    "$FFMPEG" \
+        -f v4l2 \
+        -input_format h264 \
+        -video_size "$CAMERA2_RESOLUTION" \
+        -i "$CAMERA2_DEVICE" \
+        -init_hw_device qsv=hw \
+        -filter_hw_device hw \
+        -vf hwupload=extra_hw_frames=64,format=qsv \
+        -c:v hevc_qsv \
+        -preset "$ENCODING_PRESET" \
+        -global_quality "$ENCODING_QUALITY" \
+        -look_ahead 1 \
+        -f segment \
+        -segment_time "$SEGMENT_TIME" \
+        -segment_format mp4 \
+        -reset_timestamps 1 \
+        -strftime 1 \
+        "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \
+        2>&1 | tee -a "$LOG_DIR/camera2-qsv.log" &
+elif [[ "$CAMERA2_FORMAT" == "mjpeg" ]]; then
+    # MJPEG input
+    "$FFMPEG" \
+        -f v4l2 \
+        -input_format mjpeg \
+        -video_size "$CAMERA2_RESOLUTION" \
+        -framerate "$CAMERA2_FRAMERATE" \
+        -i "$CAMERA2_DEVICE" \
+        -init_hw_device qsv=hw \
+        -filter_hw_device hw \
+        -vf hwupload=extra_hw_frames=64,format=qsv \
+        -c:v hevc_qsv \
+        -preset "$ENCODING_PRESET" \
+        -global_quality "$ENCODING_QUALITY" \
+        -look_ahead 1 \
+        -f segment \
+        -segment_time "$SEGMENT_TIME" \
+        -segment_format mp4 \
+        -reset_timestamps 1 \
+        -strftime 1 \
+        "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \
+        2>&1 | tee -a "$LOG_DIR/camera2-qsv.log" &
+else
+    # YUYV or other raw format
+    "$FFMPEG" \
+        -f v4l2 \
+        -video_size "$CAMERA2_RESOLUTION" \
+        -framerate "$CAMERA2_FRAMERATE" \
+        -i "$CAMERA2_DEVICE" \
+        -init_hw_device qsv=hw \
+        -filter_hw_device hw \
+        -vf hwupload=extra_hw_frames=64,format=qsv \
+        -c:v hevc_qsv \
+        -preset "$ENCODING_PRESET" \
+        -global_quality "$ENCODING_QUALITY" \
+        -look_ahead 1 \
+        -f segment \
+        -segment_time "$SEGMENT_TIME" \
+        -segment_format mp4 \
+        -reset_timestamps 1 \
+        -strftime 1 \
+        "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \
+        2>&1 | tee -a "$LOG_DIR/camera2-qsv.log" &
+fi
 
 CAM2_PID=$!
 log "Camera 2 recording started with PID: $CAM2_PID"

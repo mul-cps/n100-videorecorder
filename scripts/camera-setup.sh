@@ -83,7 +83,17 @@ create_camera_mapping() {
     local mapping_file="/etc/camera-recorder/camera-mapping.conf"
     mkdir -p "$(dirname "$mapping_file")"
     
-    cat > "$mapping_file" << 'EOF'
+    # Detect formats for both cameras
+    local cam1_format="h264"
+    local cam2_format="h264"
+    if [[ -c "/dev/video0" ]]; then
+        cam1_format=$(detect_best_format "/dev/video0")
+    fi
+    if [[ -c "/dev/video2" ]]; then
+        cam2_format=$(detect_best_format "/dev/video2")
+    fi
+    
+    cat > "$mapping_file" << EOF
 # Camera mapping configuration
 # Edit this file to map cameras to specific devices
 
@@ -92,12 +102,14 @@ CAMERA1_DEVICE="/dev/video0"
 CAMERA1_NAME="Primary Camera"
 CAMERA1_RESOLUTION="3840x2160"
 CAMERA1_FRAMERATE="30"
+CAMERA1_FORMAT="$cam1_format"  # Detected format: h264, mjpeg, or yuyv
 
 # Camera 2 - Secondary camera  
 CAMERA2_DEVICE="/dev/video2"
 CAMERA2_NAME="Secondary Camera"
 CAMERA2_RESOLUTION="3840x2160"
 CAMERA2_FRAMERATE="30"
+CAMERA2_FORMAT="$cam2_format"  # Detected format: h264, mjpeg, or yuyv
 
 # Encoding settings
 ENCODING_PRESET="medium"
@@ -110,6 +122,7 @@ CLEANUP_DAYS="30"
 EOF
     
     log "Camera mapping created at $mapping_file"
+    log "Detected formats - Camera 1: $cam1_format, Camera 2: $cam2_format"
     log "Please edit this file to match your camera setup"
 }
 
@@ -169,6 +182,21 @@ check_qsv_support() {
     return 0
 }
 
+detect_best_format() {
+    local device="$1"
+    
+    # Check for available formats in order of preference: H264, MJPEG, YUYV
+    if v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -q "H264"; then
+        echo "h264"
+    elif v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -q "MJPEG"; then
+        echo "mjpeg"
+    elif v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -q "YUYV"; then
+        echo "yuyv"
+    else
+        echo "unknown"
+    fi
+}
+
 test_4k_capability() {
     log "Testing 4K capture capability..."
     
@@ -176,19 +204,43 @@ test_4k_capability() {
         if [[ -c "$device" ]]; then
             log "Testing 4K on $device..."
             
-            # Test if device supports 4K MJPEG
-            if v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -A5 "MJPEG" | grep -q "3840x2160"; then
-                log "$device supports 4K MJPEG - GOOD!"
+            local format=$(detect_best_format "$device")
+            log "Best format for $device: $format"
+            
+            # Test if device supports 4K in detected format
+            if v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -A10 "$format" | grep -q "3840x2160"; then
+                log "$device supports 4K in $format format - GOOD!"
                 
-                # Quick test capture
-                timeout 3s /usr/lib/jellyfin-ffmpeg/ffmpeg \
-                    -f v4l2 \
-                    -input_format mjpeg \
-                    -video_size 3840x2160 \
-                    -framerate 15 \
-                    -i "$device" \
-                    -frames:v 1 \
-                    -y "/tmp/4k_test_$(basename "$device").jpg" &>/dev/null
+                # Quick test capture based on format
+                local ffmpeg_cmd="/usr/lib/jellyfin-ffmpeg/ffmpeg7"
+                [[ ! -x "$ffmpeg_cmd" ]] && ffmpeg_cmd="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+                
+                if [[ "$format" == "h264" ]]; then
+                    timeout 3s "$ffmpeg_cmd" \
+                        -f v4l2 \
+                        -input_format h264 \
+                        -video_size 3840x2160 \
+                        -i "$device" \
+                        -frames:v 1 \
+                        -y "/tmp/4k_test_$(basename "$device").jpg" &>/dev/null
+                elif [[ "$format" == "mjpeg" ]]; then
+                    timeout 3s "$ffmpeg_cmd" \
+                        -f v4l2 \
+                        -input_format mjpeg \
+                        -video_size 3840x2160 \
+                        -framerate 15 \
+                        -i "$device" \
+                        -frames:v 1 \
+                        -y "/tmp/4k_test_$(basename "$device").jpg" &>/dev/null
+                else
+                    timeout 3s "$ffmpeg_cmd" \
+                        -f v4l2 \
+                        -video_size 3840x2160 \
+                        -framerate 15 \
+                        -i "$device" \
+                        -frames:v 1 \
+                        -y "/tmp/4k_test_$(basename "$device").jpg" &>/dev/null
+                fi
                 
                 if [[ -f "/tmp/4k_test_$(basename "$device").jpg" ]]; then
                     log "$device: 4K capture test PASSED"
@@ -197,7 +249,7 @@ test_4k_capability() {
                     warn "$device: 4K capture test FAILED"
                 fi
             else
-                warn "$device does not support 4K MJPEG"
+                warn "$device does not support 4K in $format format"
             fi
         fi
     done

@@ -16,7 +16,14 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Configuration
-FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+# Try to find the correct FFmpeg binary
+if [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg7" ]]; then
+    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg7"
+elif [[ -x "/usr/lib/jellyfin-ffmpeg/ffmpeg6" ]]; then
+    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg6"
+else
+    FFMPEG="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+fi
 TEST_DURATION=10
 TEST_DIR="/tmp/camera-test"
 
@@ -26,21 +33,59 @@ cleanup() {
 
 trap cleanup EXIT
 
+detect_best_format() {
+    local device="$1"
+    
+    # Check for available formats in order of preference: H264, MJPEG, YUYV
+    if v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -q "H264"; then
+        echo "h264"
+    elif v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -q "MJPEG"; then
+        echo "mjpeg"
+    elif v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -q "YUYV"; then
+        echo "yuyv"
+    else
+        echo "unknown"
+    fi
+}
+
 test_basic_capture() {
     local device="$1"
     local output="$2"
     
     log "Testing basic capture from $device..."
     
-    timeout $TEST_DURATION "$FFMPEG" \
-        -f v4l2 \
-        -input_format mjpeg \
-        -video_size 1920x1080 \
-        -framerate 30 \
-        -i "$device" \
-        -c:v libx264 \
-        -preset fast \
-        -y "$output" &>/dev/null
+    local format=$(detect_best_format "$device")
+    log "Using format: $format"
+    
+    if [[ "$format" == "h264" ]]; then
+        timeout $TEST_DURATION "$FFMPEG" \
+            -f v4l2 \
+            -input_format h264 \
+            -video_size 1920x1080 \
+            -i "$device" \
+            -c:v libx264 \
+            -preset fast \
+            -y "$output" &>/dev/null
+    elif [[ "$format" == "mjpeg" ]]; then
+        timeout $TEST_DURATION "$FFMPEG" \
+            -f v4l2 \
+            -input_format mjpeg \
+            -video_size 1920x1080 \
+            -framerate 30 \
+            -i "$device" \
+            -c:v libx264 \
+            -preset fast \
+            -y "$output" &>/dev/null
+    else
+        timeout $TEST_DURATION "$FFMPEG" \
+            -f v4l2 \
+            -video_size 1920x1080 \
+            -framerate 30 \
+            -i "$device" \
+            -c:v libx264 \
+            -preset fast \
+            -y "$output" &>/dev/null
+    fi
     
     if [[ -f "$output" ]]; then
         local size=$(du -h "$output" | cut -f1)
@@ -61,20 +106,52 @@ test_qsv_encode() {
     # Set Intel driver environment
     export LIBVA_DRIVER_NAME=iHD
     
-    timeout $TEST_DURATION "$FFMPEG" \
-        -f v4l2 \
-        -input_format mjpeg \
-        -video_size 1920x1080 \
-        -framerate 30 \
-        -i "$device" \
-        -init_hw_device qsv=hw \
-        -filter_hw_device hw \
-        -vf hwupload=extra_hw_frames=64,format=qsv \
-        -c:v hevc_qsv \
-        -preset medium \
-        -global_quality 28 \
-        -look_ahead 1 \
-        -y "$output" 2>/tmp/qsv_test.log
+    local format=$(detect_best_format "$device")
+    
+    if [[ "$format" == "h264" ]]; then
+        timeout $TEST_DURATION "$FFMPEG" \
+            -f v4l2 \
+            -input_format h264 \
+            -video_size 1920x1080 \
+            -i "$device" \
+            -init_hw_device qsv=hw \
+            -filter_hw_device hw \
+            -vf hwupload=extra_hw_frames=64,format=qsv \
+            -c:v hevc_qsv \
+            -preset medium \
+            -global_quality 28 \
+            -look_ahead 1 \
+            -y "$output" 2>/tmp/qsv_test.log
+    elif [[ "$format" == "mjpeg" ]]; then
+        timeout $TEST_DURATION "$FFMPEG" \
+            -f v4l2 \
+            -input_format mjpeg \
+            -video_size 1920x1080 \
+            -framerate 30 \
+            -i "$device" \
+            -init_hw_device qsv=hw \
+            -filter_hw_device hw \
+            -vf hwupload=extra_hw_frames=64,format=qsv \
+            -c:v hevc_qsv \
+            -preset medium \
+            -global_quality 28 \
+            -look_ahead 1 \
+            -y "$output" 2>/tmp/qsv_test.log
+    else
+        timeout $TEST_DURATION "$FFMPEG" \
+            -f v4l2 \
+            -video_size 1920x1080 \
+            -framerate 30 \
+            -i "$device" \
+            -init_hw_device qsv=hw \
+            -filter_hw_device hw \
+            -vf hwupload=extra_hw_frames=64,format=qsv \
+            -c:v hevc_qsv \
+            -preset medium \
+            -global_quality 28 \
+            -look_ahead 1 \
+            -y "$output" 2>/tmp/qsv_test.log
+    fi
     
     if [[ -f "$output" ]]; then
         local size=$(du -h "$output" | cut -f1)
@@ -102,20 +179,52 @@ test_4k_qsv() {
     
     export LIBVA_DRIVER_NAME=iHD
     
-    timeout $TEST_DURATION "$FFMPEG" \
-        -f v4l2 \
-        -input_format mjpeg \
-        -video_size 3840x2160 \
-        -framerate 15 \
-        -i "$device" \
-        -init_hw_device qsv=hw \
-        -filter_hw_device hw \
-        -vf hwupload=extra_hw_frames=64,format=qsv \
-        -c:v hevc_qsv \
-        -preset medium \
-        -global_quality 28 \
-        -look_ahead 1 \
-        -y "$output" 2>/tmp/4k_qsv_test.log
+    local format=$(detect_best_format "$device")
+    
+    if [[ "$format" == "h264" ]]; then
+        timeout $TEST_DURATION "$FFMPEG" \
+            -f v4l2 \
+            -input_format h264 \
+            -video_size 3840x2160 \
+            -i "$device" \
+            -init_hw_device qsv=hw \
+            -filter_hw_device hw \
+            -vf hwupload=extra_hw_frames=64,format=qsv \
+            -c:v hevc_qsv \
+            -preset medium \
+            -global_quality 28 \
+            -look_ahead 1 \
+            -y "$output" 2>/tmp/4k_qsv_test.log
+    elif [[ "$format" == "mjpeg" ]]; then
+        timeout $TEST_DURATION "$FFMPEG" \
+            -f v4l2 \
+            -input_format mjpeg \
+            -video_size 3840x2160 \
+            -framerate 15 \
+            -i "$device" \
+            -init_hw_device qsv=hw \
+            -filter_hw_device hw \
+            -vf hwupload=extra_hw_frames=64,format=qsv \
+            -c:v hevc_qsv \
+            -preset medium \
+            -global_quality 28 \
+            -look_ahead 1 \
+            -y "$output" 2>/tmp/4k_qsv_test.log
+    else
+        timeout $TEST_DURATION "$FFMPEG" \
+            -f v4l2 \
+            -video_size 3840x2160 \
+            -framerate 15 \
+            -i "$device" \
+            -init_hw_device qsv=hw \
+            -filter_hw_device hw \
+            -vf hwupload=extra_hw_frames=64,format=qsv \
+            -c:v hevc_qsv \
+            -preset medium \
+            -global_quality 28 \
+            -look_ahead 1 \
+            -y "$output" 2>/tmp/4k_qsv_test.log
+    fi
     
     if [[ -f "$output" ]]; then
         local size=$(du -h "$output" | cut -f1)
@@ -136,18 +245,33 @@ benchmark_performance() {
     local start_time=$(date +%s)
     local cpu_start=$(grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$3+$4+$5)} END {print usage}')
     
+    local cam1_format=$(detect_best_format "/dev/video0")
+    local cam2_format=$(detect_best_format "/dev/video2")
+    
+    # Build FFmpeg command based on detected formats
+    local cam1_input=""
+    local cam2_input=""
+    
+    if [[ "$cam1_format" == "h264" ]]; then
+        cam1_input="-f v4l2 -input_format h264 -video_size 1920x1080 -i /dev/video0"
+    elif [[ "$cam1_format" == "mjpeg" ]]; then
+        cam1_input="-f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30 -i /dev/video0"
+    else
+        cam1_input="-f v4l2 -video_size 1920x1080 -framerate 30 -i /dev/video0"
+    fi
+    
+    if [[ "$cam2_format" == "h264" ]]; then
+        cam2_input="-f v4l2 -input_format h264 -video_size 1920x1080 -i /dev/video2"
+    elif [[ "$cam2_format" == "mjpeg" ]]; then
+        cam2_input="-f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30 -i /dev/video2"
+    else
+        cam2_input="-f v4l2 -video_size 1920x1080 -framerate 30 -i /dev/video2"
+    fi
+    
     # Record for 30 seconds from both cameras
     "$FFMPEG" \
-        -f v4l2 \
-        -input_format mjpeg \
-        -video_size 1920x1080 \
-        -framerate 30 \
-        -i /dev/video0 \
-        -f v4l2 \
-        -input_format mjpeg \
-        -video_size 1920x1080 \
-        -framerate 30 \
-        -i /dev/video2 \
+        $cam1_input \
+        $cam2_input \
         -init_hw_device qsv=hw \
         -filter_hw_device hw \
         -map 0:v -vf hwupload=extra_hw_frames=64,format=qsv -c:v hevc_qsv -preset medium -global_quality 28 \
@@ -233,7 +357,8 @@ main() {
             test_qsv_encode "$device" "$TEST_DIR/qsv_$cam_name.mp4" || continue
             
             # Only test 4K if device supports it
-            if v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -A5 "MJPEG" | grep -q "3840x2160"; then
+            local format=$(detect_best_format "$device")
+            if v4l2-ctl --device="$device" --list-formats-ext 2>/dev/null | grep -A10 "$format" | grep -q "3840x2160"; then
                 test_4k_qsv "$device" "$TEST_DIR/4k_qsv_$cam_name.mp4"
             fi
             
