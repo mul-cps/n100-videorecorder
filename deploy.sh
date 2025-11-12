@@ -181,13 +181,25 @@ install_jellyfin_ffmpeg() {
     # Update package lists
     apt update
     
-    # Install jellyfin-ffmpeg
-    apt install -y jellyfin-ffmpeg
+    # Install jellyfin-ffmpeg (try versioned packages first, fallback to legacy name)
+    if apt-cache show jellyfin-ffmpeg7 &>/dev/null; then
+        log "Installing jellyfin-ffmpeg7..."
+        apt install -y jellyfin-ffmpeg7
+        FFMPEG_PATH="/usr/lib/jellyfin-ffmpeg/ffmpeg7"
+    elif apt-cache show jellyfin-ffmpeg6 &>/dev/null; then
+        log "Installing jellyfin-ffmpeg6..."
+        apt install -y jellyfin-ffmpeg6
+        FFMPEG_PATH="/usr/lib/jellyfin-ffmpeg/ffmpeg6"
+    else
+        log "Installing jellyfin-ffmpeg (legacy)..."
+        apt install -y jellyfin-ffmpeg
+        FFMPEG_PATH="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+    fi
     
     # Create symlink for easier access
-    ln -sf /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/local/bin/ffmpeg-qsv
+    ln -sf "$FFMPEG_PATH" /usr/local/bin/ffmpeg-qsv
     
-    log "FFmpeg with QSV support installed"
+    log "FFmpeg with QSV support installed at $FFMPEG_PATH"
 }
 
 setup_directories() {
