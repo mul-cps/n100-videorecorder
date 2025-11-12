@@ -21,6 +21,7 @@ CAMERA1_FRAMERATE="${CAMERA1_FRAMERATE:-30}"
 CAMERA2_FRAMERATE="${CAMERA2_FRAMERATE:-30}"
 CAMERA1_FORMAT="${CAMERA1_FORMAT:-h264}"
 CAMERA2_FORMAT="${CAMERA2_FORMAT:-h264}"
+ENCODING_CODEC="${ENCODING_CODEC:-hevc_qsv}"
 ENCODING_PRESET="${ENCODING_PRESET:-medium}"
 ENCODING_QUALITY="${ENCODING_QUALITY:-28}"
 SEGMENT_TIME="${SEGMENT_TIME:-3600}"
@@ -85,33 +86,52 @@ log "Starting Camera 1 recording process..."
 
 # Build FFmpeg command based on input format
 if [[ "$CAMERA1_FORMAT" == "h264" ]]; then
-    # H264 input - decode and re-encode with QSV (simpler approach without hwupload filters)
-    "$FFMPEG" \
-        -f v4l2 \
-        -input_format h264 \
-        -video_size "$CAMERA1_RESOLUTION" \
-        -framerate "$CAMERA1_FRAMERATE" \
-        -i "$CAMERA1_DEVICE" \
-        -c:v hevc_qsv \
-        -preset "$ENCODING_PRESET" \
-        -global_quality "$ENCODING_QUALITY" \
-        -look_ahead "$LOOKAHEAD_ENABLED" \
-        -b:v "${TARGET_BITRATE}k" \
-        -maxrate "${MAX_BITRATE}k" \
-        -g "$GOP_SIZE" \
-        -refs "$REF_FRAMES" \
-        -bf 3 \
-        -vsync vfr \
-        -fps_mode passthrough \
-        -f segment \
-        -segment_time "$SEGMENT_TIME" \
-        -segment_format mp4 \
-        -segment_format_options movflags=+faststart+frag_keyframe \
-        -flush_packets 0 \
-        -reset_timestamps 1 \
-        -strftime 1 \
-        "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
-        2>&1 | tee -a "$LOG_DIR/camera1-qsv.log" &
+    if [[ "$ENCODING_CODEC" == "copy" ]]; then
+        # Stream copy mode - no transcoding, just remux to MP4 segments
+        "$FFMPEG" \
+            -f v4l2 \
+            -input_format h264 \
+            -video_size "$CAMERA1_RESOLUTION" \
+            -framerate "$CAMERA1_FRAMERATE" \
+            -i "$CAMERA1_DEVICE" \
+            -c:v copy \
+            -f segment \
+            -segment_time "$SEGMENT_TIME" \
+            -segment_format mp4 \
+            -segment_format_options movflags=+faststart+frag_keyframe \
+            -reset_timestamps 1 \
+            -strftime 1 \
+            "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
+            2>&1 | tee -a "$LOG_DIR/camera1-qsv.log" &
+    else
+        # H264 input - decode and re-encode with QSV
+        "$FFMPEG" \
+            -f v4l2 \
+            -input_format h264 \
+            -video_size "$CAMERA1_RESOLUTION" \
+            -framerate "$CAMERA1_FRAMERATE" \
+            -i "$CAMERA1_DEVICE" \
+            -c:v "$ENCODING_CODEC" \
+            -preset "$ENCODING_PRESET" \
+            -global_quality "$ENCODING_QUALITY" \
+            -look_ahead "$LOOKAHEAD_ENABLED" \
+            -b:v "${TARGET_BITRATE}k" \
+            -maxrate "${MAX_BITRATE}k" \
+            -g "$GOP_SIZE" \
+            -refs "$REF_FRAMES" \
+            -bf 3 \
+            -vsync vfr \
+            -fps_mode passthrough \
+            -f segment \
+            -segment_time "$SEGMENT_TIME" \
+            -segment_format mp4 \
+            -segment_format_options movflags=+faststart+frag_keyframe \
+            -flush_packets 0 \
+            -reset_timestamps 1 \
+            -strftime 1 \
+            "$RECORDINGS_BASE/cam1/cam1_%Y%m%d_%H%M%S.mp4" \
+            2>&1 | tee -a "$LOG_DIR/camera1-qsv.log" &
+    fi
 elif [[ "$CAMERA1_FORMAT" == "mjpeg" ]]; then
     # MJPEG input
     "$FFMPEG" \
@@ -179,33 +199,52 @@ log "Starting Camera 2 recording process..."
 
 # Build FFmpeg command based on input format
 if [[ "$CAMERA2_FORMAT" == "h264" ]]; then
-    # H264 input - decode and re-encode with QSV (simpler approach without hwupload filters)
-    "$FFMPEG" \
-        -f v4l2 \
-        -input_format h264 \
-        -video_size "$CAMERA2_RESOLUTION" \
-        -framerate "$CAMERA2_FRAMERATE" \
-        -i "$CAMERA2_DEVICE" \
-        -c:v hevc_qsv \
-        -preset "$ENCODING_PRESET" \
-        -global_quality "$ENCODING_QUALITY" \
-        -look_ahead "$LOOKAHEAD_ENABLED" \
-        -b:v "${TARGET_BITRATE}k" \
-        -maxrate "${MAX_BITRATE}k" \
-        -g "$GOP_SIZE" \
-        -refs "$REF_FRAMES" \
-        -bf 3 \
-        -vsync vfr \
-        -fps_mode passthrough \
-        -f segment \
-        -segment_time "$SEGMENT_TIME" \
-        -segment_format mp4 \
-        -segment_format_options movflags=+faststart+frag_keyframe \
-        -flush_packets 0 \
-        -reset_timestamps 1 \
-        -strftime 1 \
-        "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \
-        2>&1 | tee -a "$LOG_DIR/camera2-qsv.log" &
+    if [[ "$ENCODING_CODEC" == "copy" ]]; then
+        # Stream copy mode - no transcoding, just remux to MP4 segments
+        "$FFMPEG" \
+            -f v4l2 \
+            -input_format h264 \
+            -video_size "$CAMERA2_RESOLUTION" \
+            -framerate "$CAMERA2_FRAMERATE" \
+            -i "$CAMERA2_DEVICE" \
+            -c:v copy \
+            -f segment \
+            -segment_time "$SEGMENT_TIME" \
+            -segment_format mp4 \
+            -segment_format_options movflags=+faststart+frag_keyframe \
+            -reset_timestamps 1 \
+            -strftime 1 \
+            "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \
+            2>&1 | tee -a "$LOG_DIR/camera2-qsv.log" &
+    else
+        # H264 input - decode and re-encode with QSV
+        "$FFMPEG" \
+            -f v4l2 \
+            -input_format h264 \
+            -video_size "$CAMERA2_RESOLUTION" \
+            -framerate "$CAMERA2_FRAMERATE" \
+            -i "$CAMERA2_DEVICE" \
+            -c:v "$ENCODING_CODEC" \
+            -preset "$ENCODING_PRESET" \
+            -global_quality "$ENCODING_QUALITY" \
+            -look_ahead "$LOOKAHEAD_ENABLED" \
+            -b:v "${TARGET_BITRATE}k" \
+            -maxrate "${MAX_BITRATE}k" \
+            -g "$GOP_SIZE" \
+            -refs "$REF_FRAMES" \
+            -bf 3 \
+            -vsync vfr \
+            -fps_mode passthrough \
+            -f segment \
+            -segment_time "$SEGMENT_TIME" \
+            -segment_format mp4 \
+            -segment_format_options movflags=+faststart+frag_keyframe \
+            -flush_packets 0 \
+            -reset_timestamps 1 \
+            -strftime 1 \
+            "$RECORDINGS_BASE/cam2/cam2_%Y%m%d_%H%M%S.mp4" \
+            2>&1 | tee -a "$LOG_DIR/camera2-qsv.log" &
+    fi
 elif [[ "$CAMERA2_FORMAT" == "mjpeg" ]]; then
     # MJPEG input
     "$FFMPEG" \
