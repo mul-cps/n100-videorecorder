@@ -25,6 +25,12 @@ ENCODING_PRESET="${ENCODING_PRESET:-medium}"
 ENCODING_QUALITY="${ENCODING_QUALITY:-28}"
 SEGMENT_TIME="${SEGMENT_TIME:-3600}"
 RECORDINGS_BASE="${RECORDINGS_BASE:-/storage/recordings}"
+LOOKAHEAD_ENABLED="${LOOKAHEAD_ENABLED:-1}"
+BITRATE_MODE="${BITRATE_MODE:-VBR}"
+TARGET_BITRATE="${TARGET_BITRATE:-15000}"
+MAX_BITRATE="${MAX_BITRATE:-20000}"
+GOP_SIZE="${GOP_SIZE:-60}"
+REF_FRAMES="${REF_FRAMES:-3}"
 
 # Runtime variables
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -89,6 +95,12 @@ if [[ "$CAMERA1_FORMAT" == "h264" ]]; then
         -c:v hevc_qsv \
         -preset "$ENCODING_PRESET" \
         -global_quality "$ENCODING_QUALITY" \
+        -look_ahead "$LOOKAHEAD_ENABLED" \
+        -b:v "${TARGET_BITRATE}k" \
+        -maxrate "${MAX_BITRATE}k" \
+        -g "$GOP_SIZE" \
+        -refs "$REF_FRAMES" \
+        -bf 3 \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
@@ -112,7 +124,12 @@ elif [[ "$CAMERA1_FORMAT" == "mjpeg" ]]; then
         -c:v hevc_qsv \
         -preset "$ENCODING_PRESET" \
         -global_quality "$ENCODING_QUALITY" \
-        -look_ahead 1 \
+        -look_ahead "$LOOKAHEAD_ENABLED" \
+        -b:v "${TARGET_BITRATE}k" \
+        -maxrate "${MAX_BITRATE}k" \
+        -g "$GOP_SIZE" \
+        -refs "$REF_FRAMES" \
+        -bf 3 \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
@@ -135,7 +152,12 @@ else
         -c:v hevc_qsv \
         -preset "$ENCODING_PRESET" \
         -global_quality "$ENCODING_QUALITY" \
-        -look_ahead 1 \
+        -look_ahead "$LOOKAHEAD_ENABLED" \
+        -b:v "${TARGET_BITRATE}k" \
+        -maxrate "${MAX_BITRATE}k" \
+        -g "$GOP_SIZE" \
+        -refs "$REF_FRAMES" \
+        -bf 3 \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
@@ -165,6 +187,12 @@ if [[ "$CAMERA2_FORMAT" == "h264" ]]; then
         -c:v hevc_qsv \
         -preset "$ENCODING_PRESET" \
         -global_quality "$ENCODING_QUALITY" \
+        -look_ahead "$LOOKAHEAD_ENABLED" \
+        -b:v "${TARGET_BITRATE}k" \
+        -maxrate "${MAX_BITRATE}k" \
+        -g "$GOP_SIZE" \
+        -refs "$REF_FRAMES" \
+        -bf 3 \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
@@ -188,7 +216,12 @@ elif [[ "$CAMERA2_FORMAT" == "mjpeg" ]]; then
         -c:v hevc_qsv \
         -preset "$ENCODING_PRESET" \
         -global_quality "$ENCODING_QUALITY" \
-        -look_ahead 1 \
+        -look_ahead "$LOOKAHEAD_ENABLED" \
+        -b:v "${TARGET_BITRATE}k" \
+        -maxrate "${MAX_BITRATE}k" \
+        -g "$GOP_SIZE" \
+        -refs "$REF_FRAMES" \
+        -bf 3 \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
@@ -211,7 +244,12 @@ else
         -c:v hevc_qsv \
         -preset "$ENCODING_PRESET" \
         -global_quality "$ENCODING_QUALITY" \
-        -look_ahead 1 \
+        -look_ahead "$LOOKAHEAD_ENABLED" \
+        -b:v "${TARGET_BITRATE}k" \
+        -maxrate "${MAX_BITRATE}k" \
+        -g "$GOP_SIZE" \
+        -refs "$REF_FRAMES" \
+        -bf 3 \
         -f segment \
         -segment_time "$SEGMENT_TIME" \
         -segment_format mp4 \
