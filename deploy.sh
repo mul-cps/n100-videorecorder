@@ -140,8 +140,46 @@ setup_intel_drivers() {
 install_jellyfin_ffmpeg() {
     log "Installing Jellyfin FFmpeg with QSV support..."
     
-    # Add Jellyfin repository
-    curl -fsSL https://repo.jellyfin.org/install-debuntu.sh | bash
+    # Detect Ubuntu version
+    UBUNTU_CODENAME=$(lsb_release -cs)
+    UBUNTU_VERSION=$(lsb_release -rs)
+    
+    # Jellyfin only supports LTS releases, so we need to handle non-LTS versions
+    # Map non-LTS versions to their base LTS version
+    case "$UBUNTU_CODENAME" in
+        oracular|plucky)
+            # Ubuntu 24.10+ -> use 24.04 LTS (noble) repository
+            JELLYFIN_CODENAME="noble"
+            warn "Ubuntu $UBUNTU_VERSION detected (non-LTS). Using Ubuntu 24.04 LTS (noble) Jellyfin repository."
+            ;;
+        mantic)
+            # Ubuntu 23.10 -> use 22.04 LTS (jammy) repository
+            JELLYFIN_CODENAME="jammy"
+            warn "Ubuntu $UBUNTU_VERSION detected (non-LTS). Using Ubuntu 22.04 LTS (jammy) Jellyfin repository."
+            ;;
+        lunar|kinetic)
+            # Ubuntu 23.04, 22.10 -> use 22.04 LTS (jammy) repository
+            JELLYFIN_CODENAME="jammy"
+            warn "Ubuntu $UBUNTU_VERSION detected (non-LTS). Using Ubuntu 22.04 LTS (jammy) Jellyfin repository."
+            ;;
+        *)
+            # For LTS or unknown versions, use the current codename
+            JELLYFIN_CODENAME="$UBUNTU_CODENAME"
+            log "Using Ubuntu $UBUNTU_VERSION ($UBUNTU_CODENAME) Jellyfin repository."
+            ;;
+    esac
+    
+    # Install dependencies
+    apt install -y curl gnupg apt-transport-https
+    
+    # Add Jellyfin GPG key
+    curl -fsSL https://repo.jellyfin.org/jellyfin_team.gpg.key | gpg --dearmor -o /etc/apt/trusted.gpg.d/jellyfin.gpg
+    
+    # Add Jellyfin repository with the appropriate codename
+    echo "deb [arch=$( dpkg --print-architecture )] https://repo.jellyfin.org/ubuntu ${JELLYFIN_CODENAME} main" | tee /etc/apt/sources.list.d/jellyfin.list
+    
+    # Update package lists
+    apt update
     
     # Install jellyfin-ffmpeg
     apt install -y jellyfin-ffmpeg
