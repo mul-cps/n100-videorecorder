@@ -58,14 +58,16 @@ test_basic_capture() {
     log "Using format: $format"
     
     if [[ "$format" == "h264" ]]; then
-        # H264 input - copy stream directly (no re-encoding needed for basic test)
+        # H264 input - re-encode to HEVC with QSV for space savings
         timeout $TEST_DURATION "$FFMPEG" \
             -f v4l2 \
             -input_format h264 \
             -video_size 1920x1080 \
             -framerate 30 \
             -i "$device" \
-            -c:v copy \
+            -c:v hevc_qsv \
+            -preset fast \
+            -global_quality 28 \
             -y "$output" &>/dev/null
     elif [[ "$format" == "mjpeg" ]]; then
         timeout $TEST_DURATION "$FFMPEG" \
@@ -74,8 +76,9 @@ test_basic_capture() {
             -video_size 1920x1080 \
             -framerate 30 \
             -i "$device" \
-            -c:v libx264 \
+            -c:v hevc_qsv \
             -preset fast \
+            -global_quality 28 \
             -y "$output" &>/dev/null
     else
         timeout $TEST_DURATION "$FFMPEG" \
@@ -83,8 +86,9 @@ test_basic_capture() {
             -video_size 1920x1080 \
             -framerate 30 \
             -i "$device" \
-            -c:v libx264 \
+            -c:v hevc_qsv \
             -preset fast \
+            -global_quality 28 \
             -y "$output" &>/dev/null
     fi
     
