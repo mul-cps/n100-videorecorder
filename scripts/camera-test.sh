@@ -54,6 +54,9 @@ test_basic_capture() {
     
     log "Testing basic capture from $device..."
     
+    # Ensure output directory exists
+    mkdir -p "$(dirname "$output")"
+    
     local format=$(detect_best_format "$device")
     log "Using format: $format"
     
@@ -116,6 +119,9 @@ test_qsv_encode() {
     local output="$2"
     
     log "Testing QSV H.265 encoding from $device..."
+    
+    # Ensure output directory exists
+    mkdir -p "$(dirname "$output")"
     
     # Set Intel driver environment
     export LIBVA_DRIVER_NAME=iHD
@@ -198,6 +204,9 @@ test_4k_qsv() {
     
     log "Testing 4K QSV encoding from $device..."
     
+    # Ensure output directory exists
+    mkdir -p "$(dirname "$output")"
+    
     export LIBVA_DRIVER_NAME=iHD
     
     local format=$(detect_best_format "$device")
@@ -267,6 +276,9 @@ test_4k_qsv() {
 
 benchmark_performance() {
     log "Running performance benchmark..."
+    
+    # Ensure output directory exists
+    mkdir -p "$TEST_DIR"
     
     export LIBVA_DRIVER_NAME=iHD
     
