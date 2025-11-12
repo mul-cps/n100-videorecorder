@@ -37,9 +37,23 @@ log "2. Detecting Camera USB Connections..."
 echo
 
 # Find cameras and their USB bus info
-for device in /dev/video0 /dev/video2; do
+# Use persistent symlinks if available, otherwise fall back to /dev/video0 and /dev/video3
+CAMERA1_DEV="/dev/video-usb1-video0"
+CAMERA2_DEV="/dev/video-usb2-video3"
+
+# Fall back to direct devices if symlinks don't exist
+[[ ! -c "$CAMERA1_DEV" ]] && CAMERA1_DEV="/dev/video0"
+[[ ! -c "$CAMERA2_DEV" ]] && CAMERA2_DEV="/dev/video3"
+
+for device in "$CAMERA1_DEV" "$CAMERA2_DEV"; do
     if [[ -c "$device" ]]; then
         echo -e "${BLUE}Camera: $device${NC}"
+        
+        # Show real device if it's a symlink
+        if [[ -L "$device" ]]; then
+            real_device=$(readlink -f "$device")
+            echo "  Real device: $real_device"
+        fi
         
         # Get device info
         udevadm info --query=all --name=$device 2>/dev/null | grep -E "(BUSNUM|DEVNUM|DEVPATH|ID_MODEL|ID_VENDOR)" || true
@@ -129,9 +143,12 @@ calculate_bandwidth "1920x1080" "60" "8"
 log "6. Current Camera Capabilities..."
 echo
 
-for device in /dev/video0 /dev/video2; do
+for device in "$CAMERA1_DEV" "$CAMERA2_DEV"; do
     if [[ -c "$device" ]] && command -v v4l2-ctl &> /dev/null; then
         echo -e "${BLUE}Camera: $device${NC}"
+        if [[ -L "$device" ]]; then
+            echo "  (→ $(readlink -f $device))"
+        fi
         echo "Supported H264 formats and framerates:"
         v4l2-ctl --device=$device --list-formats-ext 2>/dev/null | grep -A20 "H264" | grep -E "(Size|Interval)" || echo "  No H264 support detected"
         echo
@@ -241,8 +258,8 @@ test_camera_bandwidth() {
 
 # Test both cameras if available
 info "Testing actual bandwidth usage (requires cameras to be idle)..."
-test_camera_bandwidth "/dev/video0" "2560x1440" "30"
-test_camera_bandwidth "/dev/video2" "2560x1440" "30"
+test_camera_bandwidth "$CAMERA1_DEV" "2560x1440" "30"
+test_camera_bandwidth "$CAMERA2_DEV" "2560x1440" "30"
 
 echo
 echo -e "${GREEN}============================================${NC}"
