@@ -148,6 +148,9 @@ class SystemConfig:
                 line = line.strip()
                 if line and not line.startswith('#') and '=' in line:
                     key, value = line.split('=', 1)
+                    # Remove inline comments (everything after #)
+                    if '#' in value:
+                        value = value.split('#')[0].strip()
                     # Remove quotes from value
                     value = value.strip('"').strip("'")
                     env_vars[key] = value

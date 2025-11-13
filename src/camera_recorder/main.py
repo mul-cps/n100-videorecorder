@@ -231,8 +231,11 @@ def main():
     """Main entry point."""
     import argparse
     
-    parser = argparse.ArgumentParser(description='N100 Camera Recorder')
-    parser.add_argument('-c', '--config', help='Path to configuration file')
+    parser = argparse.ArgumentParser(description='Advanced Camera Recording System')
+    parser.add_argument('-c', '--config', default='/etc/camera-recorder/config.yaml',
+                       help='Path to configuration file (YAML or legacy .conf)')
+    parser.add_argument('--version', action='version', version='camera-recorder 2.0.0',
+                       help='Show version and exit')
     parser.add_argument('--validate', action='store_true',
                        help='Validate configuration and exit')
     parser.add_argument('--detect', action='store_true',
