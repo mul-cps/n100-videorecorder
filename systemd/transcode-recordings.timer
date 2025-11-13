@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily transcode timer for old camera recordings
+Documentation=https://github.com/mul-cps/n100-videorecorder
+
+[Timer]
+# Run daily at 2 AM (low activity time)
+OnCalendar=daily
+OnCalendar=02:00
+
+# Run 30 minutes after boot if we missed the scheduled time
+Persistent=true
+
+[Install]
+WantedBy=timers.target

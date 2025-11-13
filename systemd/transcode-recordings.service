@@ -1,0 +1,43 @@
+[Unit]
+Description=Transcode old camera recordings to HEVC
+Documentation=https://github.com/mul-cps/n100-videorecorder
+
+[Service]
+Type=oneshot
+User=bjoern
+Group=video
+WorkingDirectory=/home/bjoern
+
+# Environment
+Environment="LIBVA_DRIVER_NAME=iHD"
+Environment="RECORDINGS_BASE=/storage/recordings"
+Environment="TRANSCODE_AGE_DAYS=2"
+Environment="ENCODING_QUALITY=23"
+Environment="ENCODING_PRESET=medium"
+
+# Run the transcoding script
+ExecStart=/usr/local/bin/transcode-old-recordings.sh
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=transcode-recordings
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectKernelModules=false
+
+# Device access for QSV
+DeviceAllow=/dev/dri/renderD128 rw
+DeviceAllow=/dev/dri/card0 rw
+SupplementaryGroups=video render
+
+# Nice level (run at lower priority)
+Nice=10
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
