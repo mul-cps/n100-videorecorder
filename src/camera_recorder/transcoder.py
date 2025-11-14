@@ -63,6 +63,7 @@ class BackgroundTranscoder:
         self.current_file: Optional[Path] = None
         self.stats = TranscodingStats()
         self.force_queue: Queue = Queue()  # Queue for force transcode requests
+        self.total_queued = 0  # Track total files queued for better status reporting
         self._load_stats()
     
     def start(self):
@@ -103,7 +104,6 @@ class BackgroundTranscoder:
                 # Check if there's a force transcode request in the queue
                 if not self.force_queue.empty():
                     candidates = self.force_queue.get()
-                    logger.info(f"Processing force transcode queue: {len(candidates)} files")
                     
                     for file_path in candidates:
                         if not self.running.is_set():
@@ -111,13 +111,14 @@ class BackgroundTranscoder:
                         
                         try:
                             self._transcode_one_file(file_path)
+                            self.total_queued = max(0, self.total_queued - 1)
                         except Exception as e:
                             logger.error(f"Error transcoding {file_path.name}: {e}")
+                            self.total_queued = max(0, self.total_queued - 1)
                         
                         # Small pause between files
                         time.sleep(5)
                     
-                    logger.info("Force transcode queue completed")
                     self.force_queue.task_done()
                     continue
                 
@@ -255,6 +256,10 @@ class BackgroundTranscoder:
     
     def _is_transcoded(self, file_path: Path) -> bool:
         """Check if file has been transcoded."""
+        # Quick check: if filename contains .hevc., it's already transcoded
+        if '.hevc.' in file_path.name:
+            return True
+        # Otherwise check for marker file
         marker = file_path.with_suffix('.mp4.transcoded')
         return marker.exists()
     
@@ -574,35 +579,94 @@ class BackgroundTranscoder:
             'running': self.running.is_set(),
             'current_file': str(self.current_file) if self.current_file else None,
             'in_schedule': self._in_schedule_window() if self.running.is_set() else False,
-            'queue_size': self.force_queue.qsize(),
+            'queue_size': self.total_queued,
             'stats': self.stats.to_dict()
         }
     
     def force_transcode_now(self) -> bool:
         """
         Force transcoding to start immediately, bypassing schedule and age restrictions.
-        Returns True if transcoding started, False if no files or already running.
+        Scans for candidates and adds them to queue as they're found.
+        Returns True if transcoding started, False if no files found.
         """
-        # Find candidates (ignore age restriction)
-        logger.info("Force transcoding: finding candidates...")
-        candidates = self._find_candidates(ignore_age=True)
-        
-        if not candidates:
-            logger.info("No files found to transcode")
-            return False
-        
-        logger.info(f"Force transcoding: found {len(candidates)} candidates")
-        
-        # Add all candidates to the force queue
-        self.force_queue.put(candidates)
-        logger.info(f"Added {len(candidates)} files to force transcode queue")
+        # Start background scanner that finds files and adds to queue
+        logger.info("Force transcoding: starting background scan...")
         
         # Start transcoding thread if not already running
         if not self.running.is_set():
             logger.info("Starting transcoder thread...")
             self.start()
         
+        # Start background scanner thread
+        Thread(
+            target=self._scan_and_queue_candidates,
+            daemon=True,
+            name="CandidateScanner"
+        ).start()
+        
         return True
+    
+    def _scan_and_queue_candidates(self):
+        """Scan for H.264 files and add them to queue as found."""
+        candidates_found = 0
+        skipped_stats = {
+            'too_new': 0,
+            'already_transcoded': 0,
+            'in_progress': 0,
+            'not_h264': 0,
+            'checked': 0
+        }
+        
+        logger.info("Scanning for transcode candidates...")
+        
+        try:
+            # Scan all camera directories
+            for cam_dir in self.recordings_base.iterdir():
+                if not cam_dir.is_dir():
+                    continue
+                
+                # Collect all MP4 files first (fast)
+                mp4_files = list(cam_dir.glob("*.mp4"))
+                
+                for video_file in mp4_files:
+                    skipped_stats['checked'] += 1
+                    
+                    # Skip if already transcoded (quick check - .hevc. in filename or marker file)
+                    if self._is_transcoded(video_file):
+                        skipped_stats['already_transcoded'] += 1
+                        continue
+                    
+                    # Skip if transcoding in progress
+                    if video_file.with_suffix('.mp4.transcoding').exists():
+                        skipped_stats['in_progress'] += 1
+                        continue
+                    
+                    # Check if it's H.264 (slower check with ffprobe)
+                    if not self._is_h264(video_file):
+                        skipped_stats['not_h264'] += 1
+                        continue
+                    
+                    # Add to queue immediately
+                    self.force_queue.put([video_file])
+                    self.total_queued += 1
+                    candidates_found += 1
+                    
+                    # Log progress every 50 files
+                    if candidates_found % 50 == 0:
+                        logger.info(f"Found {candidates_found} candidates so far, continuing scan...")
+            
+            # Final summary
+            logger.info(f"Scan complete: Scanned {skipped_stats['checked']} files, "
+                       f"found {candidates_found} candidates, "
+                       f"{skipped_stats['already_transcoded']} already transcoded, "
+                       f"{skipped_stats['in_progress']} in progress, "
+                       f"{skipped_stats['not_h264']} not H.264")
+            
+            if candidates_found == 0:
+                logger.info("No files found to transcode")
+                
+        except Exception as e:
+            logger.error(f"Error scanning for candidates: {e}", exc_info=True)
     
     def _force_transcode_worker(self, candidates: List[Path]):
         """Worker thread for force transcoding."""
