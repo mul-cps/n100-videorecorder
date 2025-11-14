@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from threading import Thread, Event
 from typing import List, Optional, Dict
 from dataclasses import dataclass, asdict
+from queue import Queue
 import psutil
 
 from .config import TranscodingConfig
@@ -61,6 +62,7 @@ class BackgroundTranscoder:
         self.thread: Optional[Thread] = None
         self.current_file: Optional[Path] = None
         self.stats = TranscodingStats()
+        self.force_queue: Queue = Queue()  # Queue for force transcode requests
         self._load_stats()
     
     def start(self):
@@ -98,6 +100,27 @@ class BackgroundTranscoder:
         """Main transcoding loop."""
         while self.running.is_set():
             try:
+                # Check if there's a force transcode request in the queue
+                if not self.force_queue.empty():
+                    candidates = self.force_queue.get()
+                    logger.info(f"Processing force transcode queue: {len(candidates)} files")
+                    
+                    for file_path in candidates:
+                        if not self.running.is_set():
+                            break
+                        
+                        try:
+                            self._transcode_one_file(file_path)
+                        except Exception as e:
+                            logger.error(f"Error transcoding {file_path.name}: {e}")
+                        
+                        # Small pause between files
+                        time.sleep(5)
+                    
+                    logger.info("Force transcode queue completed")
+                    self.force_queue.task_done()
+                    continue
+                
                 # Check if we're in schedule window
                 if not self._in_schedule_window():
                     logger.debug("Outside schedule window, sleeping...")
@@ -474,11 +497,14 @@ class BackgroundTranscoder:
         original_backup = original.with_suffix('.mp4.original')
         original.rename(original_backup)
         
-        # Rename transcoded to original name
-        transcoded.rename(original)
+        # Rename transcoded with .hevc indicator before .mp4
+        # e.g., cam1_20251112_115004.mp4 -> cam1_20251112_115004.hevc.mp4
+        new_name = original.stem + '.hevc.mp4'
+        final_path = original.parent / new_name
+        transcoded.rename(final_path)
         
         # Create metadata marker
-        marker = original.with_suffix('.mp4.transcoded')
+        marker = final_path.with_suffix('.mp4.transcoded')
         delete_after = datetime.now() + timedelta(days=self.config.keep_original_days)
         
         marker.write_text(json.dumps({
@@ -487,6 +513,7 @@ class BackgroundTranscoder:
             'transcoded_size': trans_size,
             'savings_bytes': savings,
             'original_backup': str(original_backup),
+            'original_name': str(original.name),
             'delete_after': delete_after.isoformat()
         }, indent=2))
         
@@ -495,7 +522,7 @@ class BackgroundTranscoder:
         self.stats.total_transcoded_bytes += trans_size
         self.stats.space_saved_bytes += savings
         
-        logger.info(f"Replaced {original.name}: saved {savings / (1024**2):.1f} MB")
+        logger.info(f"Replaced {original.name} -> {new_name}: saved {savings / (1024**2):.1f} MB")
     
     def _cleanup_old_originals(self):
         """Delete original files after safety period."""
@@ -547,6 +574,7 @@ class BackgroundTranscoder:
             'running': self.running.is_set(),
             'current_file': str(self.current_file) if self.current_file else None,
             'in_schedule': self._in_schedule_window() if self.running.is_set() else False,
+            'queue_size': self.force_queue.qsize(),
             'stats': self.stats.to_dict()
         }
     
@@ -555,10 +583,6 @@ class BackgroundTranscoder:
         Force transcoding to start immediately, bypassing schedule and age restrictions.
         Returns True if transcoding started, False if no files or already running.
         """
-        if self.current_file:
-            logger.warning("Transcoding already in progress")
-            return False
-        
         # Find candidates (ignore age restriction)
         logger.info("Force transcoding: finding candidates...")
         candidates = self._find_candidates(ignore_age=True)
@@ -569,25 +593,14 @@ class BackgroundTranscoder:
         
         logger.info(f"Force transcoding: found {len(candidates)} candidates")
         
-        # Start transcoding in background thread if not already running
+        # Add all candidates to the force queue
+        self.force_queue.put(candidates)
+        logger.info(f"Added {len(candidates)} files to force transcode queue")
+        
+        # Start transcoding thread if not already running
         if not self.running.is_set():
-            logger.info("Starting transcoder thread for manual run...")
-            self.running.set()
-            self.thread = Thread(
-                target=self._force_transcode_worker, 
-                args=(candidates,), 
-                daemon=False,
-                name="ManualTranscoder"
-            )
-            self.thread.start()
-        else:
-            # If thread is running, just trigger one file immediately
-            logger.info("Transcoder already running, processing one file now...")
-            Thread(
-                target=self._transcode_one_file_sync, 
-                args=(candidates[0],), 
-                daemon=True
-            ).start()
+            logger.info("Starting transcoder thread...")
+            self.start()
         
         return True
     
