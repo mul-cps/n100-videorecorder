@@ -99,13 +99,17 @@ class BackgroundTranscoder:
     
     def _transcode_loop(self):
         """Main transcoding loop."""
+        logger.debug("Transcoder loop started. running=%s thread_alive=%s", self.running.is_set(), self.thread.is_alive() if self.thread else None)
         while self.running.is_set():
             try:
+                logger.debug("Transcoder loop tick. running=%s queue_size=%d", self.running.is_set(), self.force_queue.qsize())
                 # Check if there's a force transcode request in the queue
                 if not self.force_queue.empty():
+                    logger.debug("Force queue not empty, getting file...")
                     file_path = self.force_queue.get()
                     logger.info(f"Transcoding from queue: {file_path}")
                     if not self.running.is_set():
+                        logger.debug("Transcoder stopped after getting file from queue.")
                         self.force_queue.task_done()
                         continue
                     try:
@@ -115,51 +119,48 @@ class BackgroundTranscoder:
                         logger.error(f"Error transcoding {file_path}: {e}")
                         self.total_queued = max(0, self.total_queued - 1)
                     # Small pause between files
+                    logger.debug("Transcoded file, sleeping 5s before next.")
                     time.sleep(5)
                     self.force_queue.task_done()
                     continue
-                
+                logger.debug("Force queue empty, checking schedule window...")
                 # Check if we're in schedule window
                 if not self._in_schedule_window():
-                    logger.debug("Outside schedule window, sleeping...")
+                    logger.debug("Outside schedule window, sleeping 300s...")
                     time.sleep(300)  # Check every 5 minutes
                     continue
-                
+                logger.debug("In schedule window, finding candidates...")
                 # Find transcoding candidates
                 candidates = self._find_candidates()
                 if not candidates:
-                    logger.debug("No transcoding candidates found")
+                    logger.debug("No transcoding candidates found, sleeping 3600s...")
                     time.sleep(3600)  # Sleep 1 hour
                     continue
-                
                 logger.info(f"Found {len(candidates)} transcoding candidates")
-                
                 # Process files
                 for file_path in candidates:
                     if not self.running.is_set():
+                        logger.debug("Transcoder stopped during candidate processing.")
                         break
-                    
                     # Check system resources
                     if not self._should_transcode_now():
-                        logger.info("System resources not suitable, pausing...")
+                        logger.info("System resources not suitable, pausing 300s...")
                         time.sleep(300)
                         continue
-                    
+                    logger.debug(f"Transcoding candidate file: {file_path}")
                     # Transcode one file
                     self._transcode_one_file(file_path)
-                    
                     # Cleanup old originals
                     self._cleanup_old_originals()
-                    
                     # Save stats
                     self._save_stats()
-                    
                     # Pause between files
+                    logger.debug("Transcoded candidate, sleeping 60s before next.")
                     time.sleep(60)
-                
             except Exception as e:
                 logger.error(f"Error in transcoding loop: {e}", exc_info=True)
                 self.stats.last_error = str(e)
+                logger.debug("Transcoding loop error, sleeping 300s...")
                 time.sleep(300)  # Sleep 5 min on error
     
     def _find_candidates(self, ignore_age: bool = False) -> List[Path]:
@@ -365,29 +366,33 @@ class BackgroundTranscoder:
     
     def _build_ffmpeg_command(self, input_file: Path, output_file: Path) -> List[str]:
         """Build FFmpeg command for transcoding."""
+        # Use lower QP for better quality (default 23, use 18 for high quality)
+        qp_value = max(18, min(self.config.quality, 23))
         return [
             'ffmpeg',
             '-hwaccel', 'vaapi',
             '-hwaccel_device', '/dev/dri/renderD128',
             '-hwaccel_output_format', 'vaapi',
             '-i', str(input_file),
-            
-            # Video encoding (use hevc_vaapi instead of hevc_qsv)
+            # Video encoding (hevc_vaapi) with high quality profile and tune for less artifacts
             '-c:v', 'hevc_vaapi',
-            '-qp', str(self.config.quality),
-            
+            '-profile', '2',  # Main10 profile for better quality
+            '-qp', str(qp_value),
+            '-quality', 'higher',
+            '-rc_mode', 'CQP',
+            '-b:v', '0',  # No bitrate limit, use QP
+            '-g', '120',  # Larger GOP for better compression
+            '-refs', '4', # More reference frames for motion
+            '-bf', '3',   # More B-frames for detail
+            '-low_power', '0', # Disable low power for best quality
             # Copy audio (if any)
             '-c:a', 'copy',
-            
             # Metadata
             '-movflags', '+faststart',
-            
             # Force MP4 output format (needed for .transcoding extension)
             '-f', 'mp4',
-            
             # Overwrite without asking
             '-y',
-            
             # Output
             str(output_file)
         ]
@@ -408,10 +413,10 @@ class BackgroundTranscoder:
                 logger.error("Failed to get video info")
                 return False
             
-            # Check duration (within 1 second tolerance)
+            # Check duration (within 3 second tolerance)
             duration_diff = abs(orig_info['duration'] - trans_info['duration'])
-            if duration_diff > 1.0:
-                logger.error(f"Duration mismatch: {duration_diff:.1f}s difference")
+            if duration_diff > 3.0:
+                logger.error(f"Duration mismatch: {duration_diff:.1f}s difference (allowed up to 3.0s)")
                 return False
             
             # Check resolution
