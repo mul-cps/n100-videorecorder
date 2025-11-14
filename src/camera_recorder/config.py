@@ -100,6 +100,8 @@ class SystemConfig:
     transcoding: TranscodingConfig = field(default_factory=TranscodingConfig)
     vaapi_driver: str = "iHD"
     log_level: str = "INFO"
+    web_port: int = 8080
+    web_host: str = "0.0.0.0"
     
     @classmethod
     def from_yaml(cls, config_path: str) -> 'SystemConfig':
@@ -133,6 +135,8 @@ class SystemConfig:
         # Parse system settings
         config.vaapi_driver = data.get('vaapi_driver', 'iHD')
         config.log_level = data.get('log_level', 'INFO')
+        config.web_port = data.get('web_port', 8080)
+        config.web_host = data.get('web_host', '0.0.0.0')
         
         return config
     

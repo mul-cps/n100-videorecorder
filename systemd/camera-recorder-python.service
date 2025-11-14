@@ -5,9 +5,9 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=bjoern
+User=bjoernl
 Group=video
-WorkingDirectory=/home/bjoern/git/n100-videorecorder
+WorkingDirectory=/home/bjoernl/git/n100-videorecorder
 Environment="LIBVA_DRIVER_NAME=iHD"
 Environment="PYTHONUNBUFFERED=1"
 
@@ -15,8 +15,8 @@ Environment="PYTHONUNBUFFERED=1"
 ExecStartPre=/bin/sleep 5
 ExecStartPre=/bin/bash -c 'for i in {1..30}; do [ -c /dev/video0 ] || [ -L /dev/video-usb1-video0 ] && break; sleep 2; done'
 
-# Main recording command
-ExecStart=/usr/bin/python3 -m camera_recorder.main --config /etc/camera-recorder/config.yaml
+# Main recording command - using legacy .conf file (supports both YAML and .conf)
+ExecStart=/usr/local/bin/camera-recorder --config /etc/camera-recorder/camera-mapping.conf
 
 # Graceful shutdown
 KillSignal=SIGINT

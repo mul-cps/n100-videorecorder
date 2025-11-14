@@ -15,6 +15,7 @@ from .camera import CameraDetector
 from .recorder import MultiCameraRecorder
 from .storage import StorageManager
 from .transcoder import BackgroundTranscoder
+from .web import WebInterface
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,14 @@ class CameraRecorderApp:
         self.transcoder = BackgroundTranscoder(
             self.config.transcoding,
             Path(self.config.recording.base_directory)
+        )
+        
+        # Initialize web interface
+        self.web = WebInterface(
+            self, 
+            self.config, 
+            port=self.config.web_port,
+            host=self.config.web_host
         )
         
         # Setup signal handlers
@@ -159,6 +168,10 @@ class CameraRecorderApp:
             logger.info("Starting background transcoder...")
             self.transcoder.start()
         
+        # Start web interface
+        logger.info("Starting web interface...")
+        self.web.start()
+        
         # Main monitoring loop
         check_interval = 60  # Check every minute
         last_cleanup = time.time()
@@ -203,6 +216,10 @@ class CameraRecorderApp:
             logger.error(f"Error in main loop: {e}", exc_info=True)
         
         finally:
+            # Stop web interface
+            logger.info("Stopping web interface...")
+            self.web.stop()
+            
             # Stop transcoder first (give it time to finish current file)
             if self.config.transcoding.enabled:
                 logger.info("Stopping background transcoder...")

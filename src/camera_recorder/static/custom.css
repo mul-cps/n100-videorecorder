@@ -1,0 +1,129 @@
+/* Custom CSS for Camera Recorder Dashboard */
+
+/* Additional dark theme tweaks */
+body {
+    scrollbar-color: #30363d #161b22;
+}
+
+/* Smooth transitions */
+.card, .btn, .progress-bar, .recording-item {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: #161b22;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #484f58;
+}
+
+/* Loading spinner colors */
+.spinner-border {
+    color: #1f6feb;
+}
+
+/* Toast notifications (if added later) */
+.toast {
+    background-color: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+}
+
+/* Focus styles */
+.btn:focus, 
+.form-select:focus, 
+input:focus {
+    box-shadow: 0 0 0 0.25rem rgba(31, 111, 235, 0.25);
+}
+
+/* Hover effects */
+.card:hover {
+    border-color: #484f58;
+}
+
+/* Animation for recording badge */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(0.98);
+    }
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.status-indicator.active {
+    background-color: #238636;
+    box-shadow: 0 0 10px #238636;
+}
+
+.status-indicator.inactive {
+    background-color: #8b949e;
+}
+
+.status-indicator.error {
+    background-color: #da3633;
+    box-shadow: 0 0 10px #da3633;
+}
+
+/* Improved table responsiveness */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+    }
+    
+    .camera-controls {
+        flex-direction: column;
+    }
+    
+    .camera-controls .btn {
+        width: 100%;
+    }
+}
+
+/* Print styles */
+@media print {
+    .navbar, 
+    .btn, 
+    .refresh-countdown,
+    .camera-controls,
+    .log-container {
+        display: none !important;
+    }
+    
+    body {
+        background: white;
+        color: black;
+    }
+    
+    .card {
+        border: 1px solid #ccc;
+        page-break-inside: avoid;
+    }
+}

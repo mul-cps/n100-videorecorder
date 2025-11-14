@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Recorder Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent-green: #238636;
+            --accent-red: #da3633;
+            --accent-blue: #1f6feb;
+            --accent-orange: #db6d28;
+        }
+        
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+        }
+        
+        .navbar {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .navbar-brand {
+            color: var(--text-primary) !important;
+            font-weight: 600;
+        }
+        
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            background-color: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .badge-recording {
+            background-color: var(--accent-red);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .badge-stopped {
+            background-color: var(--text-secondary);
+        }
+        
+        .badge-success {
+            background-color: var(--accent-green);
+        }
+        
+        .badge-warning {
+            background-color: var(--accent-orange);
+        }
+        
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .btn-primary {
+            background-color: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+        
+        .btn-primary:hover {
+            background-color: #1a56db;
+            border-color: #1a56db;
+        }
+        
+        .btn-success {
+            background-color: var(--accent-green);
+            border-color: var(--accent-green);
+        }
+        
+        .btn-success:hover {
+            background-color: #2ea043;
+            border-color: #2ea043;
+        }
+        
+        .btn-danger {
+            background-color: var(--accent-red);
+            border-color: var(--accent-red);
+        }
+        
+        .btn-danger:hover {
+            background-color: #b62324;
+            border-color: #b62324;
+        }
+        
+        .progress {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .progress-bar {
+            background-color: var(--accent-blue);
+        }
+        
+        .progress-bar.bg-danger {
+            background-color: var(--accent-red);
+        }
+        
+        .progress-bar.bg-warning {
+            background-color: var(--accent-orange);
+        }
+        
+        .table {
+            color: var(--text-primary);
+        }
+        
+        .table > :not(caption) > * > * {
+            background-color: transparent;
+            border-bottom-color: var(--border-color);
+        }
+        
+        .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        
+        .table-hover > tbody > tr:hover > * {
+            background-color: rgba(255, 255, 255, 0.04);
+        }
+        
+        .alert {
+            border: 1px solid var(--border-color);
+        }
+        
+        .alert-info {
+            background-color: rgba(31, 111, 235, 0.1);
+            color: #58a6ff;
+        }
+        
+        .alert-warning {
+            background-color: rgba(219, 109, 40, 0.1);
+            color: #db6d28;
+        }
+        
+        .alert-danger {
+            background-color: rgba(218, 54, 51, 0.1);
+            color: #ff7b72;
+        }
+        
+        .log-container {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .recording-item {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+        
+        .recording-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: var(--accent-blue);
+        }
+        
+        .btn-group-sm > .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+        
+        .refresh-countdown {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        .system-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .system-info-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 100px;
+        }
+        
+        .system-info-value {
+            color: var(--text-primary);
+        }
+        
+        .camera-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-camera-video-fill"></i>
+                Camera Recorder Dashboard
+            </span>
+            <div class="d-flex align-items-center gap-3">
+                <span class="refresh-countdown">
+                    <i class="bi bi-clock"></i>
+                    Auto-refresh: <span id="countdown">30</span>s
+                </span>
+                <button class="btn btn-primary btn-sm" onclick="refreshAll()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- System Status Alert -->
+        <div id="systemAlert" style="display: none;"></div>
+
+        <!-- Quick Stats -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value" id="statRecording">-</div>
+                    <div class="stat-label">Recording</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value" id="statCameras">-</div>
+                    <div class="stat-label">Active Cameras</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value" id="statDiskUsage">-</div>
+                    <div class="stat-label">Disk Usage</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value" id="statUptime">-</div>
+                    <div class="stat-label">System Uptime</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera Controls -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-camera"></i> Camera Controls</span>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-success btn-sm" onclick="startAllCameras()">
+                                <i class="bi bi-play-fill"></i> Start All
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="stopAllCameras()">
+                                <i class="bi bi-stop-fill"></i> Stop All
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="cameraList">
+                            <div class="text-center text-secondary">
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                Loading cameras...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Information -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-hdd"></i> Storage Information
+                    </div>
+                    <div class="card-body">
+                        <div id="storageInfo">Loading...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-cpu"></i> System Resources
+                    </div>
+                    <div class="card-body">
+                        <div id="systemResources">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recordings -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-collection-play"></i> Recent Recordings</span>
+                        <div>
+                            <select class="form-select form-select-sm" id="cameraFilter" onchange="loadRecordings()">
+                                <option value="all">All Cameras</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="recordingsList">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transcoding Status -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-gear"></i> Background Transcoding</span>
+                        <div class="btn-group" role="group" id="transcodingControls">
+                            <button class="btn btn-success btn-sm" onclick="enableTranscoding()">
+                                <i class="bi bi-play-fill"></i> Enable
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="disableTranscoding()">
+                                <i class="bi bi-stop-fill"></i> Disable
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="transcodingStatus">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Logs -->
+        <div class="row mt-4 mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-terminal"></i> System Logs
+                    </div>
+                    <div class="card-body">
+                        <div class="log-container" id="logContent">Loading logs...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script>
+        let countdown = 30;
+        let countdownInterval;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshAll();
+            startCountdown();
+        });
+
+        function startCountdown() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            countdown = 30;
+            countdownInterval = setInterval(() => {
+                countdown--;
+                document.getElementById('countdown').textContent = countdown;
+                if (countdown <= 0) {
+                    refreshAll();
+                    countdown = 30;
+                }
+            }, 1000);
+        }
+
+        function refreshAll() {
+            loadSystemStatus();
+            loadCameras();
+            loadStorage();
+            loadSystemResources();
+            loadRecordings();
+            loadTranscodingStatus();
+            loadLogs();
+            startCountdown();
+        }
+
+        function loadSystemStatus() {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    // Update quick stats
+                    document.getElementById('statRecording').innerHTML = 
+                        data.recording ? '<i class="bi bi-record-circle text-danger"></i> YES' : 'NO';
+                    document.getElementById('statUptime').textContent = data.uptime;
+                    
+                    // Show alert if disk space is low
+                    if (data.low_space_warning) {
+                        showAlert('warning', 'Low disk space! Please free up storage.');
+                    }
+                })
+                .catch(err => console.error('Error loading system status:', err));
+        }
+
+        function loadCameras() {
+            fetch('/api/cameras')
+                .then(r => r.json())
+                .then(cameras => {
+                    document.getElementById('statCameras').textContent = 
+                        cameras.filter(c => c.recording).length + '/' + cameras.length;
+                    
+                    const cameraList = document.getElementById('cameraList');
+                    const cameraFilter = document.getElementById('cameraFilter');
+                    
+                    if (cameras.length === 0) {
+                        cameraList.innerHTML = '<div class="alert alert-info">No cameras configured</div>';
+                        return;
+                    }
+                    
+                    // Update filter dropdown
+                    const currentFilter = cameraFilter.value;
+                    cameraFilter.innerHTML = '<option value="all">All Cameras</option>';
+                    cameras.forEach(cam => {
+                        const opt = document.createElement('option');
+                        opt.value = cam.id;
+                        opt.textContent = cam.name || cam.id;
+                        cameraFilter.appendChild(opt);
+                    });
+                    cameraFilter.value = currentFilter;
+                    
+                    // Render camera cards
+                    let html = '<div class="row">';
+                    cameras.forEach(cam => {
+                        const statusBadge = cam.recording ? 
+                            '<span class="badge badge-recording">RECORDING</span>' :
+                            '<span class="badge badge-stopped">STOPPED</span>';
+                        
+                        html += `
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="recording-item">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <h5 class="mb-1">${cam.name || cam.id}</h5>
+                                            ${statusBadge}
+                                        </div>
+                                    </div>
+                                    <div class="small text-secondary mb-2">
+                                        <div><i class="bi bi-display"></i> ${cam.resolution} @ ${cam.framerate} fps</div>
+                                        <div><i class="bi bi-usb-symbol"></i> ${cam.device}</div>
+                                        <div><i class="bi bi-file-earmark-play"></i> ${cam.format}</div>
+                                    </div>
+                                    <div class="camera-controls">
+                                        ${cam.recording ? 
+                                            `<button class="btn btn-danger btn-sm" onclick="stopCamera('${cam.id}')">
+                                                <i class="bi bi-stop-fill"></i> Stop
+                                            </button>` :
+                                            `<button class="btn btn-success btn-sm" onclick="startCamera('${cam.id}')">
+                                                <i class="bi bi-play-fill"></i> Start
+                                            </button>`
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    cameraList.innerHTML = html;
+                })
+                .catch(err => console.error('Error loading cameras:', err));
+        }
+
+        function loadStorage() {
+            fetch('/api/storage')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('statDiskUsage').textContent = data.percent + '%';
+                    
+                    let progressClass = 'bg-info';
+                    if (data.percent > 90) progressClass = 'bg-danger';
+                    else if (data.percent > 75) progressClass = 'bg-warning';
+                    
+                    let html = `
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Disk Usage</span>
+                                <span>${data.used_gb} GB / ${data.total_gb} GB</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar ${progressClass}" role="progressbar" 
+                                     style="width: ${data.percent}%" 
+                                     aria-valuenow="${data.percent}" aria-valuemin="0" aria-valuemax="100">
+                                    ${data.percent}%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="system-info">
+                            <span class="system-info-label">Free Space:</span>
+                            <span class="system-info-value">${data.free_gb} GB</span>
+                        </div>
+                    `;
+                    
+                    if (data.camera_storage) {
+                        html += '<hr><h6 class="mt-3 mb-2">Per-Camera Storage</h6>';
+                        for (const [camId, storage] of Object.entries(data.camera_storage)) {
+                            html += `
+                                <div class="system-info">
+                                    <span class="system-info-label">${camId}:</span>
+                                    <span class="system-info-value">
+                                        ${storage.size_gb} GB (${storage.file_count} files)
+                                    </span>
+                                </div>
+                            `;
+                        }
+                    }
+                    
+                    document.getElementById('storageInfo').innerHTML = html;
+                })
+                .catch(err => console.error('Error loading storage:', err));
+        }
+
+        function loadSystemResources() {
+            Promise.all([
+                fetch('/api/system/cpu').then(r => r.json()),
+                fetch('/api/system/memory').then(r => r.json())
+            ])
+            .then(([cpu, memory]) => {
+                let html = `
+                    <div class="system-info">
+                        <span class="system-info-label">CPU Usage:</span>
+                        <span class="system-info-value">${cpu.percent.toFixed(1)}% (${cpu.count} cores)</span>
+                    </div>
+                    <div class="progress mb-3">
+                        <div class="progress-bar" role="progressbar" style="width: ${cpu.percent}%">
+                            ${cpu.percent.toFixed(1)}%
+                        </div>
+                    </div>
+                    
+                    <div class="system-info">
+                        <span class="system-info-label">Memory:</span>
+                        <span class="system-info-value">
+                            ${(memory.used / (1024**3)).toFixed(1)} GB / ${(memory.total / (1024**3)).toFixed(1)} GB
+                        </span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: ${memory.percent}%">
+                            ${memory.percent.toFixed(1)}%
+                        </div>
+                    </div>
+                `;
+                document.getElementById('systemResources').innerHTML = html;
+            })
+            .catch(err => console.error('Error loading system resources:', err));
+        }
+
+        function loadRecordings() {
+            const camera = document.getElementById('cameraFilter').value;
+            fetch(`/api/recordings?camera=${camera}&limit=50`)
+                .then(r => r.json())
+                .then(data => {
+                    const list = document.getElementById('recordingsList');
+                    
+                    if (data.count === 0) {
+                        list.innerHTML = '<div class="alert alert-info">No recordings found</div>';
+                        return;
+                    }
+                    
+                    let html = '<div class="table-responsive"><table class="table table-hover table-striped">';
+                    html += `
+                        <thead>
+                            <tr>
+                                <th>Camera</th>
+                                <th>Filename</th>
+                                <th>Size</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    
+                    data.recordings.forEach(rec => {
+                        html += `
+                            <tr>
+                                <td><span class="badge bg-secondary">${rec.camera}</span></td>
+                                <td><code>${rec.filename}</code></td>
+                                <td>${rec.size_mb} MB</td>
+                                <td>${rec.created_formatted}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button class="btn btn-primary" onclick="downloadRecording('${rec.camera}', '${rec.filename}')">
+                                            <i class="bi bi-download"></i>
+                                        </button>
+                                        <button class="btn btn-danger" onclick="deleteRecording('${rec.camera}', '${rec.filename}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += '</tbody></table></div>';
+                    list.innerHTML = html;
+                })
+                .catch(err => console.error('Error loading recordings:', err));
+        }
+
+        function loadTranscodingStatus() {
+            fetch('/api/transcoding/status')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.enabled && !data.running) {
+                        document.getElementById('transcodingStatus').innerHTML = 
+                            '<div class="alert alert-info">Transcoding not configured</div>';
+                        return;
+                    }
+                    
+                    const statusBadge = data.running ? 
+                        '<span class="badge badge-success">RUNNING</span>' :
+                        '<span class="badge badge-stopped">STOPPED</span>';
+                    
+                    const scheduleStatus = data.in_schedule ? 
+                        '<span class="badge badge-success">In Schedule</span>' :
+                        '<span class="badge bg-secondary">Outside Schedule</span>';
+                    
+                    let html = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="system-info">
+                                    <span class="system-info-label">Status:</span>
+                                    <span class="system-info-value">${statusBadge} ${scheduleStatus}</span>
+                                </div>
+                                ${data.current_file ? `
+                                <div class="system-info">
+                                    <span class="system-info-label">Current File:</span>
+                                    <span class="system-info-value"><code>${data.current_file}</code></span>
+                                </div>
+                                ` : ''}
+                            </div>
+                            <div class="col-md-6">
+                                <div class="system-info">
+                                    <span class="system-info-label">Files Transcoded:</span>
+                                    <span class="system-info-value">${data.stats.files_transcoded}</span>
+                                </div>
+                                <div class="system-info">
+                                    <span class="system-info-label">Space Saved:</span>
+                                    <span class="system-info-value">${(data.stats.space_saved_bytes / (1024**3)).toFixed(2)} GB</span>
+                                </div>
+                                ${data.stats.files_failed > 0 ? `
+                                <div class="system-info">
+                                    <span class="system-info-label">Failed:</span>
+                                    <span class="system-info-value text-danger">${data.stats.files_failed}</span>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.getElementById('transcodingStatus').innerHTML = html;
+                })
+                .catch(err => console.error('Error loading transcoding status:', err));
+        }
+
+        function loadLogs() {
+            fetch('/api/logs?lines=100')
+                .then(r => r.json())
+                .then(data => {
+                    const logContent = document.getElementById('logContent');
+                    if (data.error) {
+                        logContent.textContent = 'Error loading logs: ' + data.error;
+                    } else if (data.entries.length === 0) {
+                        logContent.textContent = 'No logs available';
+                    } else {
+                        logContent.textContent = data.entries.join('\n');
+                        logContent.scrollTop = logContent.scrollHeight;
+                    }
+                })
+                .catch(err => console.error('Error loading logs:', err));
+        }
+
+        // Camera control functions
+        function startCamera(cameraId) {
+            fetch(`/api/camera/${cameraId}/start`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        loadCameras();
+                    } else {
+                        showAlert('danger', 'Error: ' + data.error);
+                    }
+                })
+                .catch(err => showAlert('danger', 'Failed to start camera: ' + err));
+        }
+
+        function stopCamera(cameraId) {
+            fetch(`/api/camera/${cameraId}/stop`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        loadCameras();
+                    } else {
+                        showAlert('danger', 'Error: ' + data.error);
+                    }
+                })
+                .catch(err => showAlert('danger', 'Failed to stop camera: ' + err));
+        }
+
+        function startAllCameras() {
+            fetch('/api/start_all', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        loadCameras();
+                    } else {
+                        showAlert('danger', 'Error: ' + data.error);
+                    }
+                })
+                .catch(err => showAlert('danger', 'Failed to start cameras: ' + err));
+        }
+
+        function stopAllCameras() {
+            fetch('/api/stop_all', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        loadCameras();
+                    } else {
+                        showAlert('danger', 'Error: ' + data.error);
+                    }
+                })
+                .catch(err => showAlert('danger', 'Failed to stop cameras: ' + err));
+        }
+
+        // Recording functions
+        function downloadRecording(cameraId, filename) {
+            window.location.href = `/api/download/${cameraId}/${filename}`;
+        }
+
+        function deleteRecording(cameraId, filename) {
+            if (!confirm(`Delete ${filename}?`)) return;
+            
+            fetch(`/api/delete/${cameraId}/${filename}`, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        loadRecordings();
+                        loadStorage();
+                    } else {
+                        showAlert('danger', 'Error: ' + data.error);
+                    }
+                })
+                .catch(err => showAlert('danger', 'Failed to delete recording: ' + err));
+        }
+
+        // Transcoding functions
+        function enableTranscoding() {
+            fetch('/api/transcoding/enable', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        loadTranscodingStatus();
+                    } else {
+                        showAlert('danger', 'Error: ' + data.error);
+                    }
+                })
+                .catch(err => showAlert('danger', 'Failed to enable transcoding: ' + err));
+        }
+
+        function disableTranscoding() {
+            fetch('/api/transcoding/disable', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        loadTranscodingStatus();
+                    } else {
+                        showAlert('danger', 'Error: ' + data.error);
+                    }
+                })
+                .catch(err => showAlert('danger', 'Failed to disable transcoding: ' + err));
+        }
+
+        // Utility functions
+        function showAlert(type, message) {
+            const alertDiv = document.getElementById('systemAlert');
+            alertDiv.innerHTML = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            alertDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

@@ -17,6 +17,8 @@ This branch contains a sophisticated Python rewrite of the N100 Video Recorder s
 - **Storage Management**: Intelligent cleanup with emergency procedures
 - **Health Monitoring**: Continuous monitoring of recording processes
 - **CLI Interface**: Rich command-line interface with multiple operational modes
+- **Web Interface**: Modern Bootstrap-based dashboard for remote monitoring and control
+- **Background Transcoding**: Automated H.264 to H.265 conversion for space savings
 
 ## 📁 Project Structure
 
@@ -101,6 +103,27 @@ sudo systemctl start camera-recorder
 
 ## 💻 Usage
 
+### Web Interface
+
+The modern web interface provides comprehensive remote monitoring and control:
+
+```bash
+# Access the web interface at:
+http://<your-server-ip>:8080
+
+# Default port: 8080 (configurable in config.yaml)
+```
+
+**Features:**
+- 📹 Start/Stop cameras remotely
+- 💾 Download and delete recordings
+- 📊 Real-time system monitoring (CPU, memory, disk)
+- 🔧 Control background transcoding
+- 📝 Live log viewer
+- 📱 Mobile responsive design
+
+See [WEB_INTERFACE.md](WEB_INTERFACE.md) for detailed documentation.
+
 ### Command Line Interface
 
 ```bash
@@ -124,6 +147,11 @@ camera-recorder --cleanup
 
 # Dry-run cleanup (show what would be deleted)
 camera-recorder --cleanup --dry-run
+
+# Transcoding commands
+camera-recorder --transcode-stats
+camera-recorder --transcode-enable
+camera-recorder --transcode-disable
 ```
 
 ### As a SystemD Service

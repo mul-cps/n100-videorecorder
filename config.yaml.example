@@ -66,3 +66,7 @@ transcoding:
 # System settings
 vaapi_driver: "iHD"  # Intel VA-API driver (iHD for N100)
 log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+# Web interface settings
+web_port: 8080  # Web interface port
+web_host: "0.0.0.0"  # Web interface host (0.0.0.0 for all interfaces)
