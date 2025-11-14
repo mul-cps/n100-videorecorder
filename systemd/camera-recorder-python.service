@@ -7,7 +7,7 @@ Wants=network.target
 Type=simple
 User=bjoern
 Group=video
-WorkingDirectory=/home/bjoernl/git/n100-videorecorder
+WorkingDirectory=/home/bjoern/git/n100-videorecorder
 Environment="LIBVA_DRIVER_NAME=iHD"
 Environment="PYTHONUNBUFFERED=1"
 
