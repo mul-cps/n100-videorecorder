@@ -342,14 +342,14 @@ class BackgroundTranscoder:
         """Build FFmpeg command for transcoding."""
         return [
             'ffmpeg',
-            '-hwaccel', 'qsv',
-            '-hwaccel_output_format', 'qsv',
+            '-hwaccel', 'vaapi',
+            '-hwaccel_device', '/dev/dri/renderD128',
+            '-hwaccel_output_format', 'vaapi',
             '-i', str(input_file),
             
-            # Video encoding
-            '-c:v', self.config.codec,
-            '-preset', self.config.preset,
-            '-global_quality', str(self.config.quality),
+            # Video encoding (use hevc_vaapi instead of hevc_qsv)
+            '-c:v', 'hevc_vaapi',
+            '-qp', str(self.config.quality),
             
             # Copy audio (if any)
             '-c:a', 'copy',
