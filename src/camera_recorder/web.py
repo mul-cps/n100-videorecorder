@@ -229,8 +229,8 @@ class WebInterface:
         cameras_recording = 0
         
         try:
-            if self.app and self.app.recorder:
-                health = self.app.recorder.check_health()
+            if self.app_instance and self.app_instance.recorder:
+                health = self.app_instance.recorder.check_health()
                 cameras_total = len(health)
                 cameras_healthy = sum(1 for is_alive in health.values() if is_alive)
                 cameras_recording = cameras_healthy  # If alive, it's recording
@@ -241,27 +241,29 @@ class WebInterface:
         ffmpeg_processes = []
         for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'cmdline']):
             try:
-                if 'ffmpeg' in proc.info['name'].lower():
-                    cmdline_list = proc.info.get('cmdline', [])
-                    # Handle None or non-list cmdline
-                    if cmdline_list is None:
-                        cmdline_list = []
-                    elif not isinstance(cmdline_list, list):
-                        cmdline_list = [str(cmdline_list)]
-                    
-                    cmdline = ' '.join(cmdline_list)
-                    
+                # Proc name/cmdline can be None; guard against that
+                name = (proc.info.get('name') or '').lower()
+                if 'ffmpeg' in name:
+                    cmd_parts = proc.info.get('cmdline')
+                    if isinstance(cmd_parts, (list, tuple)):
+                        cmdline = ' '.join([str(x) for x in cmd_parts if x is not None])
+                    elif cmd_parts is None:
+                        cmdline = ''
+                    else:
+                        cmdline = str(cmd_parts)
+
                     # Try to identify which camera
                     camera_id = None
-                    for cam_id in self.config.cameras.keys() if isinstance(self.config.cameras, dict) else [c.id for c in self.config.cameras]:
-                        if cam_id in cmdline:
+                    cam_keys = self.config.cameras.keys() if isinstance(self.config.cameras, dict) else [c.id for c in self.config.cameras]
+                    for cam_id in cam_keys:
+                        if cam_id and cam_id in cmdline:
                             camera_id = cam_id
                             break
-                    
+
                     ffmpeg_processes.append({
-                        'pid': proc.info['pid'],
-                        'cpu': proc.info['cpu_percent'],
-                        'memory': round(proc.info['memory_percent'], 2),
+                        'pid': proc.info.get('pid'),
+                        'cpu': proc.info.get('cpu_percent'),
+                        'memory': round(proc.info.get('memory_percent') or 0.0, 2),
                         'camera': camera_id
                     })
             except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -303,7 +305,7 @@ class WebInterface:
         # Get health status from recorder
         health_status = {}
         try:
-            health_status = self.app.recorder.check_health() if self.app and self.app.recorder else {}
+            health_status = self.app_instance.recorder.check_health() if self.app_instance and self.app_instance.recorder else {}
         except Exception as e:
             logger.error(f"Error checking recorder health: {e}")
         
@@ -315,9 +317,9 @@ class WebInterface:
             is_recording = health_status.get(camera_id, False)
             
             # If health check says recording, verify process is actually alive
-            if is_recording and self.app and self.app.recorder:
+            if is_recording and self.app_instance and self.app_instance.recorder:
                 try:
-                    recorder = self.app.recorder.recorders.get(camera_id)
+                    recorder = self.app_instance.recorder.recorders.get(camera_id)
                     if recorder:
                         # Double-check process is alive and not zombie
                         is_recording = recorder.is_alive()
@@ -354,9 +356,9 @@ class WebInterface:
         DEPRECATED: Use _get_camera_status instead for more reliable status.
         """
         # Use the recorder's health check instead of searching processes
-        if self.app and self.app.recorder:
+        if self.app_instance and self.app_instance.recorder:
             try:
-                health = self.app.recorder.check_health()
+                health = self.app_instance.recorder.check_health()
                 return health.get(camera_id, False)
             except Exception as e:
                 logger.error(f"Error checking camera {camera_id}: {e}")
