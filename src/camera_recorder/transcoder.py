@@ -169,7 +169,7 @@ class BackgroundTranscoder:
                 skipped_stats['checked'] += 1
                 
                 # Skip if too new (unless ignoring age)
-                if video_file.stat().st_mtime > cutoff_time:
+                if not ignore_age and video_file.stat().st_mtime > cutoff_time:
                     skipped_stats['too_new'] += 1
                     continue
                 
