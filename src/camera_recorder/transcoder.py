@@ -357,6 +357,9 @@ class BackgroundTranscoder:
             # Metadata
             '-movflags', '+faststart',
             
+            # Force MP4 output format (needed for .transcoding extension)
+            '-f', 'mp4',
+            
             # Overwrite without asking
             '-y',
             
