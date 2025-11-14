@@ -366,34 +366,25 @@ class BackgroundTranscoder:
     
     def _build_ffmpeg_command(self, input_file: Path, output_file: Path) -> List[str]:
         """Build FFmpeg command for transcoding."""
-        # Use lower QP for better quality (default 23, use 18 for high quality)
-        qp_value = max(18, min(self.config.quality, 23))
+        # Use working VAAPI command for Intel N100
         return [
             'ffmpeg',
             '-hwaccel', 'vaapi',
             '-hwaccel_device', '/dev/dri/renderD128',
-            '-hwaccel_output_format', 'vaapi',
             '-i', str(input_file),
-            # Video encoding (hevc_vaapi) with high quality profile and tune for less artifacts
+            '-vf', 'format=nv12,hwupload',
             '-c:v', 'hevc_vaapi',
-            '-profile', '2',  # Main10 profile for better quality
-            '-qp', str(qp_value),
+            '-b:v', '4000k',
+            '-maxrate', '8000k',
+            '-g', '60',
             '-quality', 'higher',
             '-rc_mode', 'CQP',
-            '-b:v', '0',  # No bitrate limit, use QP
-            '-g', '120',  # Larger GOP for better compression
-            '-refs', '4', # More reference frames for motion
-            '-bf', '3',   # More B-frames for detail
-            '-low_power', '0', # Disable low power for best quality
-            # Copy audio (if any)
+            '-b:v', '0',
+            '-low_power', '0',
             '-c:a', 'copy',
-            # Metadata
             '-movflags', '+faststart',
-            # Force MP4 output format (needed for .transcoding extension)
             '-f', 'mp4',
-            # Overwrite without asking
             '-y',
-            # Output
             str(output_file)
         ]
     
