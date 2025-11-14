@@ -451,7 +451,10 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div id="recordingsList">Loading...</div>
+                        <div class="mb-2">
+                            <input type="text" class="form-control form-control-sm" id="recordingFilter" placeholder="Filter by filename..." oninput="filterRecordings()">
+                        </div>
+                        <div id="recordingsList" style="max-height: 400px; overflow-y: auto;">Loading...</div>
                     </div>
                 </div>
             </div>
@@ -752,7 +755,7 @@
 
         function loadRecordings() {
             const camera = document.getElementById('cameraFilter').value;
-            fetch(`/api/recordings?camera=${camera}&limit=50`)
+            fetch(`/api/recordings?camera=${camera}&limit=20`)
                 .then(r => r.json())
                 .then(data => {
                     const list = document.getElementById('recordingsList');
@@ -762,7 +765,7 @@
                         return;
                     }
                     
-                    let html = '<div class="table-responsive"><table class="table table-hover table-striped">';
+                    let html = '<div class="table-responsive"><table class="table table-hover table-striped" id="recordingsTable">';
                     html += `
                         <thead>
                             <tr>
@@ -778,9 +781,9 @@
                     
                     data.recordings.forEach(rec => {
                         html += `
-                            <tr>
+                            <tr class="recording-row">
                                 <td><span class="badge bg-secondary">${rec.camera}</span></td>
-                                <td><code>${rec.filename}</code></td>
+                                <td class="recording-filename"><code>${rec.filename}</code></td>
                                 <td>${rec.size_mb} MB</td>
                                 <td>${rec.created_formatted}</td>
                                 <td>
@@ -799,8 +802,18 @@
                     
                     html += '</tbody></table></div>';
                     list.innerHTML = html;
+                    filterRecordings();
                 })
                 .catch(err => console.error('Error loading recordings:', err));
+
+        function filterRecordings() {
+            const filter = document.getElementById('recordingFilter').value.toLowerCase();
+            const rows = document.querySelectorAll('#recordingsTable .recording-row');
+            rows.forEach(row => {
+                const filename = row.querySelector('.recording-filename').textContent.toLowerCase();
+                row.style.display = filename.includes(filter) ? '' : 'none';
+            });
+        }
         }
 
         function loadTranscodingStatus() {
