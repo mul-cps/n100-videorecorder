@@ -173,40 +173,106 @@ class WebInterface:
             return jsonify({'success': False, 'error': 'Transcoder not available'}), 400
     
     def _get_system_status(self) -> Dict[str, Any]:
-        """Get overall system status."""
-        # Get FFmpeg processes
+        """Get overall system status with detailed health information."""
+        # Get camera health status
+        cameras_healthy = 0
+        cameras_total = 0
+        cameras_recording = 0
+        
+        try:
+            if self.app and self.app.recorder:
+                health = self.app.recorder.check_health()
+                cameras_total = len(health)
+                cameras_healthy = sum(1 for is_alive in health.values() if is_alive)
+                cameras_recording = cameras_healthy  # If alive, it's recording
+        except Exception as e:
+            logger.error(f"Error getting camera health: {e}")
+        
+        # Get FFmpeg processes (for additional verification)
         ffmpeg_processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
+        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'cmdline']):
             try:
                 if 'ffmpeg' in proc.info['name'].lower():
+                    cmdline = ' '.join(proc.info.get('cmdline', []))
+                    # Try to identify which camera
+                    camera_id = None
+                    for cam_id in self.config.cameras.keys() if isinstance(self.config.cameras, dict) else [c.id for c in self.config.cameras]:
+                        if cam_id in cmdline:
+                            camera_id = cam_id
+                            break
+                    
                     ffmpeg_processes.append({
                         'pid': proc.info['pid'],
                         'cpu': proc.info['cpu_percent'],
-                        'memory': proc.info['memory_percent']
+                        'memory': round(proc.info['memory_percent'], 2),
+                        'camera': camera_id
                     })
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
         
+        # Determine overall recording status
+        recording = cameras_recording > 0
+        
+        # Check for health issues
+        has_issues = cameras_healthy < cameras_total
+        
         return {
             'timestamp': datetime.now().isoformat(),
             'uptime': self._get_uptime(),
-            'recording': len(ffmpeg_processes) > 0,
+            'recording': recording,
+            'cameras': {
+                'total': cameras_total,
+                'recording': cameras_recording,
+                'healthy': cameras_healthy,
+                'issues': cameras_total - cameras_healthy
+            },
             'ffmpeg_processes': len(ffmpeg_processes),
             'processes': ffmpeg_processes,
-            'transcoding_enabled': self.config.transcoding.enabled if hasattr(self.config, 'transcoding') else False
+            'transcoding_enabled': self.config.transcoding.enabled if hasattr(self.config, 'transcoding') else False,
+            'health_status': 'healthy' if not has_issues else 'degraded' if cameras_recording > 0 else 'critical'
         }
     
     def _get_camera_status(self) -> List[Dict[str, Any]]:
-        """Get status of all cameras."""
+        """Get status of all cameras with sophisticated health checking."""
         cameras_status = []
         
         # Handle both dict and list camera configurations
         cameras = self.config.cameras if isinstance(self.config.cameras, dict) else {c.id: c for c in self.config.cameras}
         
+        # Get health status from recorder
+        health_status = {}
+        try:
+            health_status = self.app.recorder.check_health() if self.app and self.app.recorder else {}
+        except Exception as e:
+            logger.error(f"Error checking recorder health: {e}")
+        
         for camera_id, camera in cameras.items():
             if not camera.enabled:
                 continue
-                
+            
+            # Determine recording status with multiple checks
+            is_recording = health_status.get(camera_id, False)
+            
+            # If health check says recording, verify process is actually alive
+            if is_recording and self.app and self.app.recorder:
+                try:
+                    recorder = self.app.recorder.recorders.get(camera_id)
+                    if recorder:
+                        # Double-check process is alive and not zombie
+                        is_recording = recorder.is_alive()
+                        
+                        # Additional process health check
+                        if is_recording and recorder.process:
+                            try:
+                                # Check if process is still responsive
+                                returncode = recorder.process.poll()
+                                is_recording = (returncode is None)
+                            except Exception:
+                                is_recording = False
+                except Exception as e:
+                    logger.debug(f"Error checking {camera_id} recorder status: {e}")
+                    is_recording = False
+            
             status = {
                 'id': camera_id,
                 'name': getattr(camera, 'name', camera_id),
@@ -214,15 +280,27 @@ class WebInterface:
                 'resolution': f"{camera.width}x{camera.height}",
                 'framerate': camera.framerate,
                 'format': getattr(camera, 'format', camera.input_format),
-                'recording': self._is_camera_recording(camera_id)
+                'recording': is_recording,
+                'healthy': is_recording  # Add health indicator
             }
             cameras_status.append(status)
         
         return cameras_status
     
     def _is_camera_recording(self, camera_id: str) -> bool:
-        """Check if camera is currently recording."""
-        # Check if recorder process exists for this camera
+        """
+        Check if camera is currently recording.
+        DEPRECATED: Use _get_camera_status instead for more reliable status.
+        """
+        # Use the recorder's health check instead of searching processes
+        if self.app and self.app.recorder:
+            try:
+                health = self.app.recorder.check_health()
+                return health.get(camera_id, False)
+            except Exception as e:
+                logger.error(f"Error checking camera {camera_id}: {e}")
+        
+        # Fallback to process search (unreliable but better than nothing)
         for proc in psutil.process_iter(['cmdline']):
             try:
                 cmdline = ' '.join(proc.info['cmdline'])

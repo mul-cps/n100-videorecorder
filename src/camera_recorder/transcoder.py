@@ -144,6 +144,13 @@ class BackgroundTranscoder:
     def _find_candidates(self, ignore_age: bool = False) -> List[Path]:
         """Find files eligible for transcoding."""
         candidates = []
+        skipped_stats = {
+            'too_new': 0,
+            'already_transcoded': 0,
+            'in_progress': 0,
+            'not_h264': 0,
+            'checked': 0
+        }
         
         # Calculate cutoff time (ignore if force transcoding)
         if ignore_age:
@@ -151,29 +158,45 @@ class BackgroundTranscoder:
         else:
             cutoff_time = time.time() - (self.config.min_age_days * 86400)
         
+        logger.debug(f"Finding candidates (ignore_age={ignore_age}, cutoff_time={cutoff_time})")
+        
         # Scan all camera directories
         for cam_dir in self.recordings_base.iterdir():
             if not cam_dir.is_dir():
                 continue
             
             for video_file in cam_dir.glob("*.mp4"):
+                skipped_stats['checked'] += 1
+                
                 # Skip if too new (unless ignoring age)
                 if video_file.stat().st_mtime > cutoff_time:
+                    skipped_stats['too_new'] += 1
                     continue
                 
                 # Skip if already transcoded
                 if self._is_transcoded(video_file):
+                    skipped_stats['already_transcoded'] += 1
                     continue
                 
                 # Skip if transcoding in progress
                 if video_file.with_suffix('.mp4.transcoding').exists():
+                    skipped_stats['in_progress'] += 1
                     continue
                 
                 # Check if it's H.264 (not already H.265)
                 if not self._is_h264(video_file):
+                    skipped_stats['not_h264'] += 1
                     continue
                 
                 candidates.append(video_file)
+        
+        # Log statistics
+        logger.info(f"Scanned {skipped_stats['checked']} files: "
+                   f"{len(candidates)} candidates, "
+                   f"{skipped_stats['too_new']} too new, "
+                   f"{skipped_stats['already_transcoded']} already transcoded, "
+                   f"{skipped_stats['in_progress']} in progress, "
+                   f"{skipped_stats['not_h264']} not H.264")
         
         # Sort by oldest first
         candidates.sort(key=lambda f: f.stat().st_mtime)
@@ -192,8 +215,17 @@ class BackgroundTranscoder:
                 str(file_path)
             ]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode != 0:
+                logger.warning(f"ffprobe failed for {file_path.name}: {result.stderr}")
+                return False
+                
             codec = result.stdout.strip().lower()
+            logger.debug(f"{file_path.name}: codec={codec}")
             return codec in ['h264', 'avc']
+        except FileNotFoundError:
+            logger.error("ffprobe not found! Please install ffmpeg/ffprobe")
+            return False
         except Exception as e:
             logger.error(f"Error checking codec for {file_path}: {e}")
             return False

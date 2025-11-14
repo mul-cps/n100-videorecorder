@@ -74,6 +74,15 @@
             background-color: var(--accent-orange);
         }
         
+        .recording-item.border-warning {
+            border-left: 4px solid var(--accent-orange) !important;
+            background-color: rgba(255, 193, 7, 0.05);
+        }
+        
+        .recording-item.border-secondary {
+            border-left: 4px solid var(--text-secondary) !important;
+        }
+        
         .stat-card {
             text-align: center;
             padding: 20px;
@@ -528,9 +537,42 @@
                 .then(r => r.json())
                 .then(data => {
                     // Update quick stats
-                    document.getElementById('statRecording').innerHTML = 
-                        data.recording ? '<i class="bi bi-record-circle text-danger"></i> YES' : 'NO';
+                    const recordingStatus = data.recording ? 
+                        '<i class="bi bi-record-circle text-danger"></i> YES' : 
+                        'NO';
+                    document.getElementById('statRecording').innerHTML = recordingStatus;
                     document.getElementById('statUptime').textContent = data.uptime;
+                    
+                    // Show health status badge if available
+                    if (data.health_status) {
+                        const healthBadge = document.createElement('span');
+                        healthBadge.className = 'badge ms-2 ';
+                        
+                        if (data.health_status === 'healthy') {
+                            healthBadge.className += 'bg-success';
+                            healthBadge.textContent = 'Healthy';
+                        } else if (data.health_status === 'degraded') {
+                            healthBadge.className += 'bg-warning text-dark';
+                            healthBadge.textContent = 'Degraded';
+                        } else {
+                            healthBadge.className += 'bg-danger';
+                            healthBadge.textContent = 'Critical';
+                        }
+                        
+                        const statElem = document.getElementById('statRecording');
+                        // Remove existing badge if any
+                        const existingBadge = statElem.querySelector('.badge');
+                        if (existingBadge) existingBadge.remove();
+                        statElem.appendChild(healthBadge);
+                    }
+                    
+                    // Show camera health issues
+                    if (data.cameras && data.cameras.issues > 0) {
+                        showAlert('danger', 
+                            `⚠️ ${data.cameras.issues} camera(s) not recording! ` +
+                            `${data.cameras.recording}/${data.cameras.total} cameras operational.`
+                        );
+                    }
                     
                     // Show alert if disk space is low
                     if (data.low_space_warning) {
@@ -569,16 +611,32 @@
                     // Render camera cards
                     let html = '<div class="row">';
                     cameras.forEach(cam => {
-                        const statusBadge = cam.recording ? 
-                            '<span class="badge badge-recording">RECORDING</span>' :
-                            '<span class="badge badge-stopped">STOPPED</span>';
+                        // Determine status with health check
+                        const isHealthy = cam.healthy !== false; // Default to true if not provided
+                        const isRecording = cam.recording;
+                        
+                        let statusBadge;
+                        let cardClass = 'recording-item';
+                        
+                        if (isRecording && isHealthy) {
+                            statusBadge = '<span class="badge badge-recording"><i class="bi bi-record-circle"></i> RECORDING</span>';
+                        } else if (isRecording && !isHealthy) {
+                            statusBadge = '<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> UNHEALTHY</span>';
+                            cardClass += ' border-warning';
+                        } else {
+                            statusBadge = '<span class="badge badge-stopped"><i class="bi bi-stop-circle"></i> STOPPED</span>';
+                            cardClass += ' border-secondary';
+                        }
                         
                         html += `
                             <div class="col-md-6 col-lg-4 mb-3">
-                                <div class="recording-item">
+                                <div class="${cardClass}">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <div>
-                                            <h5 class="mb-1">${cam.name || cam.id}</h5>
+                                            <h5 class="mb-1">
+                                                ${cam.name || cam.id}
+                                                ${!isHealthy && isRecording ? '<i class="bi bi-exclamation-circle text-warning" title="Camera may have crashed"></i>' : ''}
+                                            </h5>
                                             ${statusBadge}
                                         </div>
                                     </div>
@@ -598,9 +656,7 @@
                                         }
                                     </div>
                                 </div>
-                            </div>
-                        `;
-                    });
+                            </div>`;
                     html += '</div>';
                     cameraList.innerHTML = html;
                 })
