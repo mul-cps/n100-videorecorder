@@ -171,6 +171,55 @@ class WebInterface:
                 else:
                     return jsonify({'success': False, 'error': 'No files to transcode or already running'})
             return jsonify({'success': False, 'error': 'Transcoder not available'}), 400
+        
+        @self.flask_app.route('/api/system/restart_cameras', methods=['POST'])
+        def api_restart_cameras():
+            """Restart all camera recorders for failure recovery."""
+            try:
+                logger.warning("Camera restart requested via web interface")
+                
+                # Stop all cameras
+                if self.app_instance and self.app_instance.recorder:
+                    logger.info("Stopping all cameras...")
+                    self.app_instance.recorder.stop_all(timeout=10)
+                    
+                    # Wait a moment
+                    import time
+                    time.sleep(2)
+                    
+                    # Restart all cameras
+                    logger.info("Starting all cameras...")
+                    results = self.app_instance.recorder.start_all()
+                    
+                    # Check results
+                    successful = sum(1 for success in results.values() if success)
+                    total = len(results)
+                    
+                    if successful == total:
+                        return jsonify({
+                            'success': True, 
+                            'message': f'All {total} cameras restarted successfully'
+                        })
+                    elif successful > 0:
+                        return jsonify({
+                            'success': True,
+                            'message': f'{successful}/{total} cameras restarted successfully',
+                            'warning': f'{total - successful} cameras failed to start'
+                        })
+                    else:
+                        return jsonify({
+                            'success': False,
+                            'error': 'All cameras failed to restart'
+                        }), 500
+                else:
+                    return jsonify({'success': False, 'error': 'Recorder not available'}), 400
+                    
+            except Exception as e:
+                logger.error(f"Error restarting cameras: {e}", exc_info=True)
+                return jsonify({
+                    'success': False,
+                    'error': f'Restart failed: {str(e)}'
+                }), 500
     
     def _get_system_status(self) -> Dict[str, Any]:
         """Get overall system status with detailed health information."""

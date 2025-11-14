@@ -397,6 +397,9 @@
                             <button class="btn btn-danger btn-sm" onclick="stopAllCameras()">
                                 <i class="bi bi-stop-fill"></i> Stop All
                             </button>
+                            <button class="btn btn-warning btn-sm" onclick="restartAllCameras()" title="Restart all cameras for failure recovery">
+                                <i class="bi bi-arrow-clockwise"></i> Restart All
+                            </button>
                         </div>
                     </div>
                     <div class="card-body">
@@ -1027,6 +1030,35 @@
                     }
                 })
                 .catch(err => showAlert('danger', 'Failed to stop cameras: ' + err));
+        }
+
+        function restartAllCameras() {
+            if (!confirm('⚠️ This will restart all camera recorders. Continue?')) {
+                return;
+            }
+            
+            showAlert('info', '<i class="bi bi-arrow-clockwise"></i> Restarting all cameras... Please wait.');
+            
+            fetch('/api/system/restart_cameras', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', '✓ ' + data.message);
+                        if (data.warning) {
+                            showAlert('warning', '⚠️ ' + data.warning);
+                        }
+                        // Reload camera status after restart
+                        setTimeout(() => {
+                            loadCameras();
+                            loadSystemStatus();
+                        }, 1000);
+                    } else {
+                        showAlert('danger', '✗ ' + (data.error || 'Restart failed'));
+                    }
+                })
+                .catch(err => {
+                    showAlert('danger', '✗ Failed to restart cameras: ' + err);
+                });
         }
 
         // Recording functions
