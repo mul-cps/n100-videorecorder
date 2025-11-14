@@ -7,7 +7,7 @@ Wants=network.target
 Type=simple
 User=bjoern
 Group=video
-WorkingDirectory=/home/bjoern/git/n100-videorecorder
+# No fixed WorkingDirectory - let the application handle it
 Environment="LIBVA_DRIVER_NAME=iHD"
 Environment="PYTHONUNBUFFERED=1"
 
@@ -15,8 +15,8 @@ Environment="PYTHONUNBUFFERED=1"
 ExecStartPre=/bin/sleep 5
 ExecStartPre=/bin/bash -c 'for i in {1..30}; do [ -c /dev/video0 ] || [ -L /dev/video-usb1-video0 ] && break; sleep 2; done'
 
-# Main recording command - using legacy .conf file (supports both YAML and .conf)
-ExecStart=/usr/local/bin/camera-recorder --config /etc/camera-recorder/camera-mapping.conf
+# Main recording command - uses config from /etc/camera-recorder/
+ExecStart=/usr/local/bin/camera-recorder --config /etc/camera-recorder/config.yaml
 
 # Graceful shutdown
 KillSignal=SIGINT
