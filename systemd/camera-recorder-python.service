@@ -5,7 +5,7 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=bjoernl
+User=bjoern
 Group=video
 WorkingDirectory=/home/bjoernl/git/n100-videorecorder
 Environment="LIBVA_DRIVER_NAME=iHD"
