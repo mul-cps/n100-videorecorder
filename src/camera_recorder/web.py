@@ -138,7 +138,11 @@ class WebInterface:
         def api_transcoding_status():
             """Get transcoding status."""
             if hasattr(self.app_instance, 'transcoder'):
-                return jsonify(self.app_instance.transcoder.get_status())
+                status = self.app_instance.transcoder.get_status()
+                # Add detailed progress if transcoding
+                if status.get('current_file'):
+                    status['progress'] = self._get_transcoding_progress(status['current_file'])
+                return jsonify(status)
             return jsonify({'enabled': False})
         
         @self.flask_app.route('/api/transcoding/enable', methods=['POST'])
@@ -155,6 +159,17 @@ class WebInterface:
             if hasattr(self.app_instance, 'transcoder'):
                 self.app_instance.transcoder.stop()
                 return jsonify({'success': True, 'message': 'Transcoding disabled'})
+            return jsonify({'success': False, 'error': 'Transcoder not available'}), 400
+        
+        @self.flask_app.route('/api/transcoding/start_now', methods=['POST'])
+        def api_transcoding_start_now():
+            """Force transcoding to start immediately."""
+            if hasattr(self.app_instance, 'transcoder'):
+                success = self.app_instance.transcoder.force_transcode_now()
+                if success:
+                    return jsonify({'success': True, 'message': 'Transcoding started'})
+                else:
+                    return jsonify({'success': False, 'error': 'No files to transcode or already running'})
             return jsonify({'success': False, 'error': 'Transcoder not available'}), 400
     
     def _get_system_status(self) -> Dict[str, Any]:
@@ -420,6 +435,46 @@ class WebInterface:
             return f"{days}d {hours}h {minutes}m"
         except Exception:
             return "Unknown"
+    
+    def _get_transcoding_progress(self, current_file: str) -> Dict[str, Any]:
+        """Get detailed transcoding progress for current file."""
+        try:
+            # Parse the file path
+            file_path = Path(current_file)
+            if not file_path.exists():
+                return {'error': 'File not found'}
+            
+            # Get file info
+            file_size = file_path.stat().st_size
+            file_size_mb = file_size / (1024 * 1024)
+            
+            # Look for the .transcoding file
+            transcoding_file = file_path.with_suffix('.mp4.transcoding')
+            
+            progress_info = {
+                'filename': file_path.name,
+                'original_size_mb': round(file_size_mb, 2),
+                'camera': file_path.parent.name,
+            }
+            
+            if transcoding_file.exists():
+                trans_size = transcoding_file.stat().st_size
+                trans_size_mb = trans_size / (1024 * 1024)
+                progress_percent = min(100, int((trans_size / file_size) * 100))
+                
+                progress_info.update({
+                    'transcoding_size_mb': round(trans_size_mb, 2),
+                    'progress_percent': progress_percent,
+                    'estimated_savings_mb': round(file_size_mb - trans_size_mb, 2)
+                })
+            else:
+                progress_info['progress_percent'] = 0
+            
+            return progress_info
+            
+        except Exception as e:
+            logger.error(f"Error getting transcoding progress: {e}")
+            return {'error': str(e)}
     
     def start(self):
         """Start the web server in a separate thread."""

@@ -183,6 +183,94 @@
             max-height: 400px;
             overflow-y: auto;
             font-family: 'Courier New', Courier, monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        
+        .log-line {
+            margin-bottom: 2px;
+            word-wrap: break-word;
+        }
+        
+        .log-line.error {
+            color: #ff7b72;
+            font-weight: 500;
+        }
+        
+        .log-line.warning {
+            color: #ffa657;
+        }
+        
+        .log-line.info {
+            color: #79c0ff;
+        }
+        
+        .log-line.debug {
+            color: #8b949e;
+        }
+        
+        .log-timestamp {
+            color: #6e7681;
+            margin-right: 8px;
+        }
+        
+        .log-level {
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin: 0 8px;
+            font-size: 0.85em;
+        }
+        
+        .log-level.error,
+        .log-level.critical {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .log-level.warning {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .log-level.info {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .log-level.debug {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .log-module {
+            color: #6c757d;
+            font-style: italic;
+            margin-right: 8px;
+        }        .progress {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            height: 24px;
+        }
+        
+        .progress-bar {
+            background-color: var(--accent-blue);
+            transition: width 0.3s ease;
+        }
+        
+        .transcoding-progress {
+            background-color: rgba(31, 111, 235, 0.1);
+            border: 1px solid var(--accent-blue);
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        
+        .progress-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
             font-size: 0.875rem;
             color: var(--text-secondary);
         }
@@ -366,6 +454,9 @@
                         <div class="btn-group" role="group" id="transcodingControls">
                             <button class="btn btn-success btn-sm" onclick="enableTranscoding()">
                                 <i class="bi bi-play-fill"></i> Enable
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="forceTranscodeNow()" title="Start transcoding immediately (bypasses schedule)">
+                                <i class="bi bi-lightning-fill"></i> Transcode Now
                             </button>
                             <button class="btn btn-danger btn-sm" onclick="disableTranscoding()">
                                 <i class="bi bi-stop-fill"></i> Disable
@@ -677,12 +768,45 @@
                                     <span class="system-info-label">Status:</span>
                                     <span class="system-info-value">${statusBadge} ${scheduleStatus}</span>
                                 </div>
-                                ${data.current_file ? `
+                    `;
+                    
+                    // Show detailed progress if transcoding
+                    if (data.current_file && data.progress) {
+                        const prog = data.progress;
+                        html += `
+                                <div class="transcoding-progress mt-3">
+                                    <h6><i class="bi bi-file-earmark-play"></i> Currently Transcoding</h6>
+                                    <div class="mb-2">
+                                        <strong>${prog.filename}</strong>
+                                        <span class="badge bg-secondary ms-2">${prog.camera}</span>
+                                    </div>
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: ${prog.progress_percent}%"
+                                             aria-valuenow="${prog.progress_percent}" 
+                                             aria-valuemin="0" aria-valuemax="100">
+                                            ${prog.progress_percent}%
+                                        </div>
+                                    </div>
+                                    <div class="progress-detail">
+                                        <span>Original: ${prog.original_size_mb} MB</span>
+                                        ${prog.transcoding_size_mb ? 
+                                            `<span>Current: ${prog.transcoding_size_mb} MB</span>` : ''}
+                                        ${prog.estimated_savings_mb ? 
+                                            `<span class="text-success">Est. Savings: ${prog.estimated_savings_mb} MB</span>` : ''}
+                                    </div>
+                                </div>
+                        `;
+                    } else if (data.current_file) {
+                        html += `
                                 <div class="system-info">
                                     <span class="system-info-label">Current File:</span>
                                     <span class="system-info-value"><code>${data.current_file}</code></span>
                                 </div>
-                                ` : ''}
+                        `;
+                    }
+                    
+                    html += `
                             </div>
                             <div class="col-md-6">
                                 <div class="system-info">
@@ -691,14 +815,31 @@
                                 </div>
                                 <div class="system-info">
                                     <span class="system-info-label">Space Saved:</span>
-                                    <span class="system-info-value">${(data.stats.space_saved_bytes / (1024**3)).toFixed(2)} GB</span>
+                                    <span class="system-info-value text-success">
+                                        ${(data.stats.space_saved_bytes / (1024**3)).toFixed(2)} GB
+                                    </span>
                                 </div>
-                                ${data.stats.files_failed > 0 ? `
+                    `;
+                    
+                    if (data.stats.files_failed > 0) {
+                        html += `
                                 <div class="system-info">
                                     <span class="system-info-label">Failed:</span>
                                     <span class="system-info-value text-danger">${data.stats.files_failed}</span>
                                 </div>
-                                ` : ''}
+                        `;
+                    }
+                    
+                    if (data.stats.last_transcoded) {
+                        html += `
+                                <div class="system-info">
+                                    <span class="system-info-label">Last Transcoded:</span>
+                                    <span class="system-info-value">${new Date(data.stats.last_transcoded).toLocaleString()}</span>
+                                </div>
+                        `;
+                    }
+                    
+                    html += `
                             </div>
                         </div>
                     `;
@@ -714,15 +855,65 @@
                 .then(data => {
                     const logContent = document.getElementById('logContent');
                     if (data.error) {
-                        logContent.textContent = 'Error loading logs: ' + data.error;
+                        logContent.innerHTML = '<div class="text-danger">Error loading logs: ' + escapeHtml(data.error) + '</div>';
                     } else if (data.entries.length === 0) {
-                        logContent.textContent = 'No logs available';
+                        logContent.innerHTML = '<div class="text-muted">No logs available</div>';
                     } else {
-                        logContent.textContent = data.entries.join('\n');
-                        logContent.scrollTop = logContent.scrollHeight;
+                        // Parse and format log lines
+                        let html = '';
+                        data.entries.forEach(line => {
+                            line = line.trim();
+                            if (!line) return;
+                            
+                            // Detect log level
+                            let logClass = 'log-line';
+                            if (line.includes('ERROR') || line.includes('CRITICAL') || line.includes('Failed')) {
+                                logClass += ' error';
+                            } else if (line.includes('WARNING') || line.includes('WARN')) {
+                                logClass += ' warning';
+                            } else if (line.includes('DEBUG')) {
+                                logClass += ' debug';
+                            } else if (line.includes('INFO')) {
+                                logClass += ' info';
+                            }
+                            
+                            // Try to parse timestamp and level
+                            // Format: 2024-01-15 10:23:45,123 - camera_recorder.transcoder - INFO - Message
+                            const timestampMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})/);
+                            const levelMatch = line.match(/ - (DEBUG|INFO|WARNING|ERROR|CRITICAL) - /);
+                            
+                            if (timestampMatch && levelMatch) {
+                                const timestamp = timestampMatch[1];
+                                const level = levelMatch[1];
+                                const messageStart = line.indexOf(` - ${level} - `) + ` - ${level} - `.length;
+                                const message = line.substring(messageStart);
+                                const module = line.substring(timestamp.length + 3, line.indexOf(` - ${level} - `));
+                                
+                                html += `
+                                    <div class="${logClass}">
+                                        <span class="log-timestamp">${timestamp}</span>
+                                        <span class="log-level ${level.toLowerCase()}">${level}</span>
+                                        <span class="log-module">${escapeHtml(module)}</span>
+                                        <span class="log-message">${escapeHtml(message)}</span>
+                                    </div>
+                                `;
+                            } else {
+                                // Fallback for non-standard format
+                                html += `<div class="${logClass}">${escapeHtml(line)}</div>`;
+                            }
+                        });
+                        
+                        logContent.innerHTML = html;
+                        logContent.scrollTop = logContent.scrollHeight; // Auto-scroll to bottom
                     }
                 })
                 .catch(err => console.error('Error loading logs:', err));
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // Camera control functions
@@ -831,6 +1022,25 @@
                     }
                 })
                 .catch(err => showAlert('danger', 'Failed to disable transcoding: ' + err));
+        }
+
+        function forceTranscodeNow() {
+            if (!confirm('Start transcoding immediately? This will bypass the schedule and age restrictions.')) {
+                return;
+            }
+            
+            fetch('/api/transcoding/start_now', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message + ' - Check logs for progress');
+                        loadTranscodingStatus();
+                        loadLogs();
+                    } else {
+                        showAlert('warning', data.error);
+                    }
+                })
+                .catch(err => showAlert('danger', 'Failed to start transcoding: ' + err));
         }
 
         // Utility functions

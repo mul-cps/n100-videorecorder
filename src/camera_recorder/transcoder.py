@@ -141,10 +141,15 @@ class BackgroundTranscoder:
                 self.stats.last_error = str(e)
                 time.sleep(300)  # Sleep 5 min on error
     
-    def _find_candidates(self) -> List[Path]:
+    def _find_candidates(self, ignore_age: bool = False) -> List[Path]:
         """Find files eligible for transcoding."""
         candidates = []
-        cutoff_time = time.time() - (self.config.min_age_days * 86400)
+        
+        # Calculate cutoff time (ignore if force transcoding)
+        if ignore_age:
+            cutoff_time = 0  # All files eligible
+        else:
+            cutoff_time = time.time() - (self.config.min_age_days * 86400)
         
         # Scan all camera directories
         for cam_dir in self.recordings_base.iterdir():
@@ -152,7 +157,7 @@ class BackgroundTranscoder:
                 continue
             
             for video_file in cam_dir.glob("*.mp4"):
-                # Skip if too new
+                # Skip if too new (unless ignoring age)
                 if video_file.stat().st_mtime > cutoff_time:
                     continue
                 
@@ -509,3 +514,71 @@ class BackgroundTranscoder:
             'in_schedule': self._in_schedule_window() if self.running.is_set() else False,
             'stats': self.stats.to_dict()
         }
+    
+    def force_transcode_now(self) -> bool:
+        """
+        Force transcoding to start immediately, bypassing schedule and age restrictions.
+        Returns True if transcoding started, False if no files or already running.
+        """
+        if self.current_file:
+            logger.warning("Transcoding already in progress")
+            return False
+        
+        # Find candidates (ignore age restriction)
+        logger.info("Force transcoding: finding candidates...")
+        candidates = self._find_candidates(ignore_age=True)
+        
+        if not candidates:
+            logger.info("No files found to transcode")
+            return False
+        
+        logger.info(f"Force transcoding: found {len(candidates)} candidates")
+        
+        # Start transcoding in background thread if not already running
+        if not self.running.is_set():
+            logger.info("Starting transcoder thread for manual run...")
+            self.running.set()
+            self.thread = Thread(
+                target=self._force_transcode_worker, 
+                args=(candidates,), 
+                daemon=False,
+                name="ManualTranscoder"
+            )
+            self.thread.start()
+        else:
+            # If thread is running, just trigger one file immediately
+            logger.info("Transcoder already running, processing one file now...")
+            Thread(
+                target=self._transcode_one_file_sync, 
+                args=(candidates[0],), 
+                daemon=True
+            ).start()
+        
+        return True
+    
+    def _force_transcode_worker(self, candidates: List[Path]):
+        """Worker thread for force transcoding."""
+        try:
+            for file in candidates:
+                if not self.running.is_set():
+                    break
+                
+                try:
+                    self._transcode_one_file(file)
+                except Exception as e:
+                    logger.error(f"Error transcoding {file}: {e}")
+                
+                # Small pause between files
+                time.sleep(5)
+                
+        finally:
+            self.running.clear()
+            self._save_stats()
+            logger.info("Force transcoding completed")
+    
+    def _transcode_one_file_sync(self, file: Path):
+        """Synchronous version of transcode_one_file for immediate processing."""
+        try:
+            self._transcode_one_file(file)
+        except Exception as e:
+            logger.error(f"Error in sync transcode: {e}")
