@@ -103,22 +103,19 @@ class BackgroundTranscoder:
             try:
                 # Check if there's a force transcode request in the queue
                 if not self.force_queue.empty():
-                    candidates = self.force_queue.get()
-                    
-                    for file_path in candidates:
-                        if not self.running.is_set():
-                            break
-                        
-                        try:
-                            self._transcode_one_file(file_path)
-                            self.total_queued = max(0, self.total_queued - 1)
-                        except Exception as e:
-                            logger.error(f"Error transcoding {file_path.name}: {e}")
-                            self.total_queued = max(0, self.total_queued - 1)
-                        
-                        # Small pause between files
-                        time.sleep(5)
-                    
+                    file_path = self.force_queue.get()
+                    logger.info(f"Transcoding from queue: {file_path}")
+                    if not self.running.is_set():
+                        self.force_queue.task_done()
+                        continue
+                    try:
+                        self._transcode_one_file(file_path)
+                        self.total_queued = max(0, self.total_queued - 1)
+                    except Exception as e:
+                        logger.error(f"Error transcoding {file_path}: {e}")
+                        self.total_queued = max(0, self.total_queued - 1)
+                    # Small pause between files
+                    time.sleep(5)
                     self.force_queue.task_done()
                     continue
                 
@@ -645,9 +642,8 @@ class BackgroundTranscoder:
                     if not self._is_h264(video_file):
                         skipped_stats['not_h264'] += 1
                         continue
-                    
-                    # Add to queue immediately
-                    self.force_queue.put([video_file])
+                    # Add to queue immediately (single file)
+                    self.force_queue.put(video_file)
                     self.total_queued += 1
                     candidates_found += 1
                     
