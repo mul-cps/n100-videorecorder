@@ -242,7 +242,15 @@ class WebInterface:
         for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'cmdline']):
             try:
                 if 'ffmpeg' in proc.info['name'].lower():
-                    cmdline = ' '.join(proc.info.get('cmdline', []))
+                    cmdline_list = proc.info.get('cmdline', [])
+                    # Handle None or non-list cmdline
+                    if cmdline_list is None:
+                        cmdline_list = []
+                    elif not isinstance(cmdline_list, list):
+                        cmdline_list = [str(cmdline_list)]
+                    
+                    cmdline = ' '.join(cmdline_list)
+                    
                     # Try to identify which camera
                     camera_id = None
                     for cam_id in self.config.cameras.keys() if isinstance(self.config.cameras, dict) else [c.id for c in self.config.cameras]:
@@ -257,6 +265,10 @@ class WebInterface:
                         'camera': camera_id
                     })
             except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+            except Exception as e:
+                # Catch any other errors (like TypeError) and continue
+                logger.debug(f"Error processing ffmpeg process: {e}")
                 pass
         
         # Determine overall recording status
